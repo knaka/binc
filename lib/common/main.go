@@ -59,6 +59,15 @@ func InfoFile(h hash.Hash) string {
 	)
 }
 
+var homeDir = Ensure(os.UserHomeDir())
+
+// SetHomeDir should be available only for testing?
+func SetHomeDir(dir string) {
+	homeDir = dir
+}
+
 func linksDir() string {
-	return filepath.Join(Ensure(os.UserHomeDir()), ".binc")
+	path := filepath.Join(homeDir, ".binc")
+	Ensure0(os.MkdirAll(path, 0755))
+	return path
 }

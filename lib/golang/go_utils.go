@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	. "github.com/knaka/go-utils"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 // findGoModFile finds the go.mod file in the given directory or its parents.
@@ -37,22 +39,22 @@ type GoEnv struct {
 	Version string `json:"GOVERSION"`
 }
 
-// findGoCmd finds the go command.
-func findGoCmd() (string, error) {
-	p := filepath.Join(os.Getenv("GOROOT"), "bin", "go")
-	if stat, err := os.Stat(p); err == nil && !stat.IsDir() {
-		return p, nil
+var goCmd = sync.OnceValues(func() (goPath string, err error) {
+	defer Catch(&err)
+	path := filepath.Join(os.Getenv("GOROOT"), "bin", "go")
+	if stat, err := os.Stat(path); err == nil && !stat.IsDir() {
+		return path, nil
 	}
-	goPath, err := exec.LookPath("go")
+	goPath = Ensure(exec.LookPath("go"))
 	if err == nil {
 		return goPath, nil
 	}
-	p = filepath.Join(runtime.GOROOT(), "bin", "go")
-	if stat, err := os.Stat(p); err == nil && !stat.IsDir() {
-		return p, nil
+	path = filepath.Join(runtime.GOROOT(), "bin", "go")
+	if stat, err := os.Stat(path); err == nil && !stat.IsDir() {
+		return path, nil
 	}
 	return "", errors.New("go command not found")
-}
+})
 
 // splitArgs splits the arguments into the arguments for `go run` and the arguments for the command.
 func splitArgs(goCmd string, args []string) (runArgs []string, cmdArgs []string, err error) {
@@ -89,12 +91,9 @@ func splitArgs(goCmd string, args []string) (runArgs []string, cmdArgs []string,
 	return
 }
 
-func getGoEnv(goCmd string) (env GoEnv, err error) {
-	cmd := exec.Command(goCmd, "env", "-json")
-	out, err := cmd.Output()
-	if err != nil {
-		return
-	}
-	err = json.Unmarshal(out, &env)
+var goEnv = sync.OnceValues(func() (goEnv_ GoEnv, err error) {
+	defer Catch(&err)
+	outStr := Ensure(exec.Command(Ensure(goCmd()), "env", "-json").Output())
+	Ensure0(json.Unmarshal(outStr, &goEnv_))
 	return
-}
+})

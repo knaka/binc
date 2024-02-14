@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/knaka/binc/lib/common"
 	. "github.com/knaka/go-utils"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,69 +17,49 @@ type GoFileManager struct {
 
 var _ common.Manager = &GoFileManager{}
 
-func compile(dir string) (exe string, err error) {
+func compileFile(goFile string) (exe string, err error) {
 	defer Catch(&err)
-	prevDir := Ensure(os.Getwd())
-	Ensure0(os.Chdir(filepath.Dir(dir)))
-	defer (func() { Ensure0(os.Chdir(prevDir)) })()
-
-	goCmd := Ensure(findGoCmd())
-	goEnv := Ensure(getGoEnv(goCmd))
-
-	base := filepath.Base(dir)
-	targetDir := fmt.Sprintf(".%c%s", filepath.Separator, base)
-	buildArgs := []string{"-tags", "", targetDir}
-	goFileInfoList, buildArgsWoTgt, err := getGoFileInfoList(buildArgs)
+	// filepath.Join() removes the trailing dot.
+	targetFile := fmt.Sprintf(".%c%s", filepath.Separator, filepath.Base(goFile))
+	buildArgs := []string{"-tags", "", targetFile}
 	if err != nil {
 		return
 	}
 	buildInfo := newBuildInfoWithFiles(
-		goEnv.Version,
-		buildArgsWoTgt,
-		goFileInfoList,
+		Ensure(goEnv()).Version,
+		buildArgs,
+		[]*FileInfo{
+			Ensure(getGoFileInfo(goFile)),
+		},
 	)
-
 	exe = common.CacheFile(buildInfo.Hash)
+	// If the cache binary is not found, build it.
 	if _, err := os.Stat(exe); err != nil {
+		prevDir := Ensure(os.Getwd())
+		Ensure0(os.Chdir(filepath.Dir(goFile)))
+		defer (func() { Ignore(os.Chdir(prevDir)) })()
 		buildCommand := []string{"build"}
 		buildCommand = append(buildCommand, "-o", exe)
 		buildCommand = append(buildCommand, buildArgs...)
-		buildCommand = append(buildCommand, targetDir)
-		log.Println("7b580ab", buildCommand)
-		cmd := exec.Command(goCmd, buildCommand...)
+		cmd := exec.Command(Ensure(goCmd()), buildCommand...)
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
 		Ensure0(cmd.Run())
+		Ensure0(os.Chdir(prevDir))
 		buildInfoJson := Ensure(json.Marshal(buildInfo))
 		Ensure0(os.WriteFile(common.InfoFile(buildInfo.Hash), buildInfoJson, 0644))
 	}
-
 	return exe, nil
 }
 
-func (m *GoFileManager) CanRun(cmd string) bool {
-	baseName := filepath.Base(cmd)
-	entries := Ensure(os.ReadDir(m.dir))
-	for _, ent := range entries {
-		if ent.IsDir() {
-			if ent.Name() == baseName {
-				return true
-			}
-			continue
-		}
-	}
-	return false
-}
-
 func (m *GoFileManager) Run(args []string) error {
-	//log.Println("args:", args)
 	baseName := filepath.Base(args[0])
 	entries := Ensure(os.ReadDir(m.dir))
 	for _, ent := range entries {
 		if ent.IsDir() {
 			if ent.Name() == baseName {
 				dirAbs := filepath.Join(m.dir, baseName)
-				exe := Ensure(compile(dirAbs))
+				exe := Ensure(compileFile(dirAbs))
 				cmd := exec.Command(exe, args[1:]...)
 				cmd.Args[0] = baseName
 				cmd.Stdout = os.Stdout
@@ -101,22 +80,21 @@ func (m *GoFileManager) Run(args []string) error {
 	return nil
 }
 
-func (m *GoFileManager) CanManage(dir string) bool {
-	var err error
-	defer Catch(&err)
-	// If the directory contains at least one "*.go" file,
-	matches := Ensure(filepath.Glob(filepath.Join(dir, "*.go")))
-	if len(matches) > 0 {
-		return false
-	}
-	matches = Ensure(filepath.Glob(filepath.Join(dir, "*", "*.go")))
-	if len(matches) > 0 {
-		return true
+// CanRun checks if the command can be run by this manager.
+func (m *GoFileManager) CanRun(cmd string) bool {
+	baseName := filepath.Base(cmd)
+	for _, goFile := range m.files {
+		if filepath.Base(goFile) == baseName+".go" {
+			return true
+		}
 	}
 	return false
 }
 
-func newFileManager(dir string) common.Manager {
+func newGoFileManager(dir string) *GoFileManager {
+	if _, err := goCmd(); err != nil {
+		return nil
+	}
 	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
 		return nil
 	}
@@ -131,6 +109,8 @@ func newFileManager(dir string) common.Manager {
 }
 
 func init() {
-	common.RegisterManagerFactory(newFileManager, 100)
-	//common.RegisterManagerFactory(newDirManager, 99)
+	common.RegisterManagerFactory(
+		func(dir string) common.Manager { return newGoFileManager(dir) },
+		100,
+	)
 }

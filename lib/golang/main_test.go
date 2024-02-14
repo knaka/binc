@@ -84,7 +84,7 @@ func TestCompile(t *testing.T) {
 	common.SetHomeDir(homeDir)
 	exe := Ensure(compileFile(filepath.Join("testdata", "prj", "cmd", "say_hello.go")))
 	cmd := exec.Command(exe)
-	assert.Contains(t, exe, "8a37f7eaaa05aeeff66bd6251305bac9173b2c4b")
+	assert.Contains(t, exe, "ec28ed01d279cdc9d5ff7bd1b84db2e0eb389293")
 	output := Ensure(cmd.Output())
 	assert.Contains(t, string(output), "Hello, World!")
 }

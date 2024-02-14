@@ -1,0 +1,6 @@
+github.com/friendsofgo/errors v0.9.2 h1:X6NYxef4efCBdwI7BgS820zFaN7Cphrmb+Pljdzjtgk=
+github.com/friendsofgo/errors v0.9.2/go.mod h1:yCvFW5AkDIL9qn7suHVLiI/gH228n7PC4Pn44IGoTOI=
+github.com/knaka/go-utils v0.0.2024021245 h1:zewY7qDUWGPGyGFXGI27YvQe/dA1Hz6+1gTslNTFVcw=
+github.com/knaka/go-utils v0.0.2024021245/go.mod h1:pPo2tS2TMayST0eq5PamI6rYk32xsysDHFhdJ2MbwIE=
+golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 h1:9zdDQZ7Thm29KFXgAX/+yaf3eVbP7djjWp/dXAppNCc=
+golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=

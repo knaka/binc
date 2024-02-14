@@ -2,6 +2,7 @@ package golang
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/knaka/binc/lib/common"
 	. "github.com/knaka/go-utils"
@@ -52,32 +53,24 @@ func compileFile(goFile string) (exe string, err error) {
 	return exe, nil
 }
 
-func (m *GoFileManager) Run(args []string) error {
+func (m *GoFileManager) Run(args []string) (err error) {
+	defer Catch(&err)
 	baseName := filepath.Base(args[0])
-	entries := Ensure(os.ReadDir(m.dir))
-	for _, ent := range entries {
-		if ent.IsDir() {
-			if ent.Name() == baseName {
-				dirAbs := filepath.Join(m.dir, baseName)
-				exe := Ensure(compileFile(dirAbs))
-				cmd := exec.Command(exe, args[1:]...)
-				cmd.Args[0] = baseName
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				err := cmd.Run()
-				if err != nil {
-					return err
-				}
-				break
+	for _, goFile := range m.files {
+		if filepath.Base(goFile) == baseName+".go" {
+			exe := Ensure(compileFile(goFile))
+			cmd := exec.Command(exe, args[1:]...)
+			cmd.Args[0] = args[0]
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			err := cmd.Run()
+			if err != nil {
+				return err
 			}
-			continue
-		}
-		if ent.Name() == baseName+".go" {
+			return nil
 		}
 	}
-	//log.Println("dirAbs:", dirAbs)
-	//log.Println("fileAbs:", fileAbs)
-	return nil
+	return errors.New("file not found")
 }
 
 // CanRun checks if the command can be run by this manager.

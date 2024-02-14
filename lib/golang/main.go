@@ -11,11 +11,12 @@ import (
 	"path/filepath"
 )
 
-type GoManager struct {
-	dir string
+type GoFileManager struct {
+	dir   string
+	files []string
 }
 
-var _ common.Manager = &GoManager{}
+var _ common.Manager = &GoFileManager{}
 
 func compile(dir string) (exe string, err error) {
 	defer Catch(&err)
@@ -39,7 +40,7 @@ func compile(dir string) (exe string, err error) {
 		goFileInfoList,
 	)
 
-	exe = cacheFile(buildInfo.Hash)
+	exe = common.CacheFile(buildInfo.Hash)
 	if _, err := os.Stat(exe); err != nil {
 		buildCommand := []string{"build"}
 		buildCommand = append(buildCommand, "-o", exe)
@@ -51,13 +52,13 @@ func compile(dir string) (exe string, err error) {
 		cmd.Stderr = os.Stderr
 		Ensure0(cmd.Run())
 		buildInfoJson := Ensure(json.Marshal(buildInfo))
-		Ensure0(os.WriteFile(infoFile(buildInfo.Hash), buildInfoJson, 0644))
+		Ensure0(os.WriteFile(common.InfoFile(buildInfo.Hash), buildInfoJson, 0644))
 	}
 
 	return exe, nil
 }
 
-func (m *GoManager) CanRun(cmd string) bool {
+func (m *GoFileManager) CanRun(cmd string) bool {
 	baseName := filepath.Base(cmd)
 	entries := Ensure(os.ReadDir(m.dir))
 	for _, ent := range entries {
@@ -71,7 +72,7 @@ func (m *GoManager) CanRun(cmd string) bool {
 	return false
 }
 
-func (m *GoManager) Run(args []string) error {
+func (m *GoFileManager) Run(args []string) error {
 	//log.Println("args:", args)
 	baseName := filepath.Base(args[0])
 	entries := Ensure(os.ReadDir(m.dir))
@@ -100,7 +101,7 @@ func (m *GoManager) Run(args []string) error {
 	return nil
 }
 
-func (m *GoManager) CanManage(dir string) bool {
+func (m *GoFileManager) CanManage(dir string) bool {
 	var err error
 	defer Catch(&err)
 	// If the directory contains at least one "*.go" file,
@@ -115,12 +116,21 @@ func (m *GoManager) CanManage(dir string) bool {
 	return false
 }
 
-func newManager(dir string) common.Manager {
-	return &GoManager{
-		dir: dir,
+func newFileManager(dir string) common.Manager {
+	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
+		return nil
+	}
+	matches := Ensure(filepath.Glob(filepath.Join(dir, "*.go")))
+	if len(matches) == 0 {
+		return nil
+	}
+	return &GoFileManager{
+		dir:   dir,
+		files: matches,
 	}
 }
 
 func init() {
-	common.RegisterManagerFactory(newManager, 100)
+	common.RegisterManagerFactory(newFileManager, 100)
+	//common.RegisterManagerFactory(newDirManager, 99)
 }

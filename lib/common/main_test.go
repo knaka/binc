@@ -9,8 +9,8 @@ import (
 )
 
 func TestLinkDir(t *testing.T) {
-	assert.Equal(t, linksDir(), filepath.Join(Ensure(os.UserHomeDir()), ".binc"))
+	assert.Equal(t, LinksDir(), filepath.Join(Ensure(os.UserHomeDir()), ".binc"))
 	homeDir := filepath.Join(t.TempDir(), "myhome")
 	SetHomeDir(homeDir)
-	assert.Equal(t, linksDir(), filepath.Join(homeDir, ".binc"))
+	assert.Equal(t, LinksDir(), filepath.Join(homeDir, ".binc"))
 }

@@ -30,33 +30,38 @@ type Manager interface {
 	Run(args []string) error
 }
 
-func CacheRootDir() string {
-	cacheRootDir := filepath.Join(linksDir(), ".cache")
+func CacheRootDir() (cacheRootDir string, err error) {
+	defer Catch(&err)
+	cacheRootDir = filepath.Join(Ensure(LinksDir()), ".cache")
 	Ensure0(os.MkdirAll(cacheRootDir, 0755))
-	return cacheRootDir
+	return cacheRootDir, nil
 }
 
-func CacheDir(h hash.Hash) (dir string) {
+func CacheDir(h hash.Hash) (dir string, err error) {
+	defer Catch(&err)
 	dir = filepath.Join(
-		CacheRootDir(),
+		Ensure(CacheRootDir()),
 		hex.EncodeToString(h.Sum(nil)),
 	)
 	Ensure0(os.MkdirAll(dir, 0755))
-	return dir
+	return dir, nil
 }
 
-func CacheFile(h hash.Hash) string {
-	return filepath.Join(
-		CacheDir(h),
+func CacheFile(h hash.Hash) (cacheFile string, err error) {
+	cacheFile = filepath.Join(
+		Ensure(CacheDir(h)),
 		"exe",
 	)
+	return
 }
 
-func InfoFile(h hash.Hash) string {
-	return filepath.Join(
-		CacheDir(h),
+func InfoFile(h hash.Hash) (infoFile string, err error) {
+	defer Catch(&err)
+	infoFile = filepath.Join(
+		Ensure(CacheDir(h)),
 		"info.json",
 	)
+	return infoFile, err
 }
 
 var homeDir = Ensure(os.UserHomeDir())
@@ -66,8 +71,9 @@ func SetHomeDir(dir string) {
 	homeDir = dir
 }
 
-func linksDir() string {
-	path := filepath.Join(homeDir, ".binc")
+func LinksDir() (path string, err error) {
+	defer Catch(&err)
+	path = filepath.Join(homeDir, ".binc")
 	Ensure0(os.MkdirAll(path, 0755))
-	return path
+	return path, nil
 }

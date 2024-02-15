@@ -33,7 +33,7 @@ func compileFile(goFile string) (exe string, err error) {
 			Ensure(getGoFileInfo(goFile)),
 		},
 	)
-	exe = common.CacheFile(buildInfo.Hash)
+	exe = Ensure(common.CacheFile(buildInfo.Hash))
 	// If the cache binary is not found, build it.
 	if _, err := os.Stat(exe); err != nil {
 		prevDir := Ensure(os.Getwd())
@@ -48,7 +48,7 @@ func compileFile(goFile string) (exe string, err error) {
 		Ensure0(cmd.Run())
 		Ensure0(os.Chdir(prevDir))
 		buildInfoJson := Ensure(json.Marshal(buildInfo))
-		Ensure0(os.WriteFile(common.InfoFile(buildInfo.Hash), buildInfoJson, 0644))
+		Ensure0(os.WriteFile(Ensure(common.InfoFile(buildInfo.Hash)), buildInfoJson, 0644))
 	}
 	return exe, nil
 }

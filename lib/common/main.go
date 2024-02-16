@@ -18,9 +18,10 @@ type Factory struct {
 
 var factories []*Factory
 
+// Factories returns a list of factories in descending order of priority weight.
 func Factories() []*Factory {
 	sort.Slice(factories, func(i, j int) bool {
-		return factories[i].PriorityWeight < factories[j].PriorityWeight
+		return factories[i].PriorityWeight > factories[j].PriorityWeight
 	})
 	return factories
 }

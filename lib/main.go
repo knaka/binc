@@ -7,6 +7,7 @@ import (
 	"github.com/h2non/filetype/types"
 	"github.com/knaka/binc/lib/common"
 	_ "github.com/knaka/binc/lib/golang"
+	_ "github.com/knaka/binc/lib/haskell"
 	. "github.com/knaka/go-utils"
 	"github.com/samber/lo"
 	"io"

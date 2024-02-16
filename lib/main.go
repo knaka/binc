@@ -35,20 +35,53 @@ func iterateOverManagers(
 	})
 	for _, factory := range common.Factories() {
 		for _, dirPath := range bincDirPaths {
+			if stat, err := os.Stat(dirPath); err != nil || !stat.IsDir() {
+				continue
+			}
 			manager := factory.NewManager(dirPath)
 			if manager == nil {
 				continue
 			}
-			V0(fn(manager))
+			//V0(fn(manager))
+			err = fn(manager)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return lastError
 }
 
 func recreateLinks() (err error) {
+	defer Catch(&err)
+	linksDirPath := V(common.LinksDirPath())
+	// Remove all symlinks in the “links” directory.
+	for _, dirEntry := range V(os.ReadDir(linksDirPath)) {
+		if dirEntry.Type() != os.ModeSymlink {
+			continue
+		}
+		linkPath := filepath.Join(linksDirPath, dirEntry.Name())
+		if V(os.Readlink(linkPath)) != appBase {
+			continue
+		}
+		V0(os.Remove(linkPath))
+	}
+	// Then create links.
 	return iterateOverManagers(
-		func(manager common.Manager) error {
-			return manager.CreateLinks()
+		func(manager common.Manager) (err error) {
+			defer Catch(&err)
+			for _, linkBase := range manager.GetLinkBases() {
+				if linkBase == appBase {
+					continue
+				}
+				linkPath := filepath.Join(linksDirPath, linkBase)
+				err = os.Remove(linkPath)
+				if err != nil && !os.IsNotExist(err) {
+					return err
+				}
+				V0(os.Symlink(appBase, linkPath))
+			}
+			return nil
 		},
 		nil,
 	)
@@ -56,11 +89,12 @@ func recreateLinks() (err error) {
 
 func execute(args []string) (err error) {
 	return iterateOverManagers(
-		func(manager common.Manager) error {
+		func(manager common.Manager) (err error) {
+			defer Catch(&err)
 			if !manager.CanRun(filepath.Base(args[0])) {
 				return nil
 			}
-			err := manager.Run(args)
+			err = manager.Run(args)
 			if err != nil {
 				var exitError *exec.ExitError
 				if errors.As(err, &exitError) {

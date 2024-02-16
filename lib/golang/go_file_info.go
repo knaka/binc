@@ -17,62 +17,62 @@ type FileInfo struct {
 	Size int64  `json:"-"`
 }
 
-func getGoFileInfoList(args []string) ([]*FileInfo, []string, error) {
-	if len(args) == 0 {
-		return nil, args, nil
+func getGoFileInfoList(buildArgs []string) ([]*FileInfo, []string, error) {
+	if len(buildArgs) == 0 {
+		return nil, buildArgs, nil
 	}
-	var files []*FileInfo
-	buildArgsWoTgt := args
-	name := buildArgsWoTgt[len(buildArgsWoTgt)-1]
+	var fileInfoList []*FileInfo
+	buildArgsWoTgt := buildArgs
+	tgt := buildArgsWoTgt[len(buildArgsWoTgt)-1]
 	buildArgsWoTgt = buildArgsWoTgt[:len(buildArgsWoTgt)-1]
-	if stat, err := os.Stat(name); err == nil && stat.IsDir() {
-		_, err := findGoModFile(filepath.Dir(name))
+	if stat, err := os.Stat(tgt); err == nil && stat.IsDir() {
+		_, err := findGoModFile(filepath.Dir(tgt))
 		if err == nil {
-			return nil, args, nil
+			return nil, buildArgs, nil
 		}
-		goFiles, err := os.ReadDir(name)
+		goFiles, err := os.ReadDir(tgt)
 		if err != nil {
-			return nil, args, nil
+			return nil, buildArgs, nil
 		}
 		for _, goFile := range goFiles {
 			if strings.HasSuffix(goFile.Name(), ".go") {
-				p := filepath.Join(name, goFile.Name())
+				p := filepath.Join(tgt, goFile.Name())
 				fileInfo, err := getGoFileInfo(p)
 				if err != nil {
-					return nil, args, err
+					return nil, buildArgs, err
 				}
-				files = append(files, fileInfo)
+				fileInfoList = append(fileInfoList, fileInfo)
 			}
 		}
 	} else {
 	outer:
 		for {
-			if !strings.HasSuffix(name, ".go") {
+			if !strings.HasSuffix(tgt, ".go") {
 				break outer
 			}
-			fileInfo, err := getGoFileInfo(name)
+			fileInfo, err := getGoFileInfo(tgt)
 			if err != nil {
-				return nil, args, err
+				return nil, buildArgs, err
 			}
-			files = append(files, fileInfo)
+			fileInfoList = append(fileInfoList, fileInfo)
 			if len(buildArgsWoTgt) == 0 {
 				break outer
 			}
-			name = buildArgsWoTgt[len(buildArgsWoTgt)-1]
+			tgt = buildArgsWoTgt[len(buildArgsWoTgt)-1]
 			buildArgsWoTgt = buildArgsWoTgt[:len(buildArgsWoTgt)-1]
 		}
 	}
-	sort.Slice(files, func(i, j int) bool {
-		if files[i].Size == files[j].Size {
-			return files[i].Hash < files[j].Hash
+	sort.Slice(fileInfoList, func(i, j int) bool {
+		if fileInfoList[i].Size == fileInfoList[j].Size {
+			return fileInfoList[i].Hash < fileInfoList[j].Hash
 		}
-		return files[i].Size < files[j].Size
+		return fileInfoList[i].Size < fileInfoList[j].Size
 	})
-	return files, buildArgsWoTgt, nil
+	return fileInfoList, buildArgsWoTgt, nil
 }
 
-func getGoFileInfo(name string) (*FileInfo, error) {
-	stat, err := os.Stat(name)
+func getGoFileInfo(goFilePath string) (*FileInfo, error) {
+	stat, err := os.Stat(goFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func getGoFileInfo(name string) (*FileInfo, error) {
 	}
 	hashStr, err := (func() (string, error) {
 		hash_ := sha1.New()
-		reader, err := os.Open(name)
+		reader, err := os.Open(goFilePath)
 		if err != nil {
 			return "", err
 		}
@@ -96,7 +96,7 @@ func getGoFileInfo(name string) (*FileInfo, error) {
 		return nil, err
 	}
 	return &FileInfo{
-		Name: name,
+		Name: goFilePath,
 		Hash: hashStr,
 		Size: stat.Size(),
 	}, nil

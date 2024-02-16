@@ -9,7 +9,7 @@ import (
 	"sort"
 )
 
-type NewManagerFn func(dir string) Manager
+type NewManagerFn func(dirPath string) Manager
 
 type Factory struct {
 	PriorityWeight int
@@ -34,55 +34,55 @@ func RegisterManagerFactory(fn NewManagerFn, priorityWeight int) {
 }
 
 type Manager interface {
-	CreateLinks() (err error)
-	CanRun(cmd string) bool
+	GetLinkBases() []string
+	CanRun(cmdBase string) bool
 	Run(args []string) error
 }
 
-func CacheRootDir() (cacheRootDir string, err error) {
+func CacheRootDirPath() (cacheRootDirPath string, err error) {
 	defer Catch(&err)
-	cacheRootDir = filepath.Join(Ensure(LinksDirPath()), ".cache")
-	Ensure0(os.MkdirAll(cacheRootDir, 0755))
-	return cacheRootDir, nil
+	cacheRootDirPath = filepath.Join(Ensure(LinksDirPath()), ".cache")
+	Ensure0(os.MkdirAll(cacheRootDirPath, 0755))
+	return cacheRootDirPath, nil
 }
 
-func CacheDir(h hash.Hash) (dir string, err error) {
+func CacheDirPath(h hash.Hash) (dir string, err error) {
 	defer Catch(&err)
 	dir = filepath.Join(
-		Ensure(CacheRootDir()),
+		Ensure(CacheRootDirPath()),
 		hex.EncodeToString(h.Sum(nil)),
 	)
 	Ensure0(os.MkdirAll(dir, 0755))
 	return dir, nil
 }
 
-func CacheFile(h hash.Hash, base string) (cacheFile string, err error) {
-	cacheFile = filepath.Join(
-		Ensure(CacheDir(h)),
+func CachedExePath(h hash.Hash, base string) (cachedExePath string, err error) {
+	cachedExePath = filepath.Join(
+		Ensure(CacheDirPath(h)),
 		base,
 	)
 	return
 }
 
-func InfoFile(h hash.Hash) (infoFile string, err error) {
+func InfoFilePath(h hash.Hash) (infoFile string, err error) {
 	defer Catch(&err)
 	infoFile = filepath.Join(
-		Ensure(CacheDir(h)),
+		Ensure(CacheDirPath(h)),
 		"info.json",
 	)
 	return infoFile, err
 }
 
-var homeDir = Ensure(os.UserHomeDir())
+var homeDirPath = Ensure(os.UserHomeDir())
 
-// SetHomeDir should be available only for testing?
-func SetHomeDir(dir string) {
-	homeDir = dir
+// SetHomeDirPath should be available only for testing?
+func SetHomeDirPath(dirPath string) {
+	homeDirPath = dirPath
 }
 
 func LinksDirPath() (path string, err error) {
 	defer Catch(&err)
-	path = filepath.Join(homeDir, ".binc")
+	path = filepath.Join(homeDirPath, ".binc")
 	Ensure0(os.MkdirAll(path, 0755))
 	return
 }

@@ -42,7 +42,7 @@ func TestNewManager(t *testing.T) {
 			}
 			if manager != nil {
 				goManager := manager.(*GoFileManager)
-				assert.Greater(t, len(goManager.files), 0)
+				assert.Greater(t, len(goManager.goFilePaths), 0)
 			}
 		})
 	}
@@ -82,8 +82,8 @@ func TestCanRun(t *testing.T) {
 
 func TestCompile(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), "home")
-	common.SetHomeDir(homeDir)
-	exe := Ensure(compileFile(filepath.Join("testdata", "prj", "cmd", "say_hello.go")))
+	common.SetHomeDirPath(homeDir)
+	exe := Ensure(compile(filepath.Join("testdata", "prj", "cmd", "say_hello.go")))
 	cmd := exec.Command(exe)
 	assert.Contains(t, exe, "9be1eee6810e15186d5e5fde0b6de2a784fce948")
 	output := Ensure(cmd.Output())
@@ -92,7 +92,7 @@ func TestCompile(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), "home")
-	common.SetHomeDir(homeDir)
+	common.SetHomeDirPath(homeDir)
 	manager := newGoFileManager(filepath.Join("testdata", "prj", "cmd"))
 	Ensure0(manager.Run([]string{filepath.Join("foo", "say_hello"), "foo", "bar"}))
 }

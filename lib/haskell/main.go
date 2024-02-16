@@ -2,6 +2,7 @@ package haskell
 
 import (
 	"errors"
+	"fmt"
 	"github.com/knaka/binc/lib/common"
 	. "github.com/knaka/go-utils"
 	"os"
@@ -12,7 +13,8 @@ import (
 )
 
 type CabalScriptManager struct {
-	files []string
+	cabalCmd  string
+	filePaths []string
 }
 
 var _ common.Manager = &CabalScriptManager{}
@@ -22,32 +24,23 @@ var extensions = []string{
 	".cabal.lhs",
 }
 
-func (m *CabalScriptManager) CreateLinks() (err error) {
-	defer Catch(&err)
-	linksDir := V(common.LinksDirPath())
-	for _, hsFile := range m.files {
-		baseName := filepath.Base(hsFile)
+func (m *CabalScriptManager) GetLinkBases() (linkPaths []string) {
+	var linkBases []string
+	for _, hsFilePath := range m.filePaths {
+		hsFileBase := filepath.Base(hsFilePath)
 		for _, ext := range extensions {
-			if strings.HasSuffix(baseName, ext) {
-				nameWithoutExt := baseName[:len(baseName)-len(ext)]
-				link := filepath.Join(linksDir, nameWithoutExt)
-				err = os.Remove(link)
-				if err != nil && !os.IsNotExist(err) {
-					return err
-				}
-				V0(os.Symlink("binc", link))
-				break
+			if strings.HasSuffix(hsFileBase, ext) {
+				linkBases = append(linkBases, hsFileBase[:len(hsFileBase)-len(ext)])
 			}
 		}
 	}
-	return nil
+	return linkBases
 }
 
-func (m *CabalScriptManager) CanRun(cmd string) bool {
-	baseName := filepath.Base(cmd)
-	for _, hsFile := range m.files {
+func (m *CabalScriptManager) CanRun(cmdBase string) bool {
+	for _, hsFilePath := range m.filePaths {
 		for _, ext := range extensions {
-			if filepath.Base(hsFile) == baseName+ext {
+			if filepath.Base(hsFilePath) == cmdBase+ext {
 				return true
 			}
 		}
@@ -57,49 +50,40 @@ func (m *CabalScriptManager) CanRun(cmd string) bool {
 
 func (m *CabalScriptManager) Run(args []string) (err error) {
 	defer Catch(&err)
-	baseName := filepath.Base(args[0])
-	for _, hsFile := range m.files {
+	cmdBase := filepath.Base(args[0])
+	for _, hsFilePath := range m.filePaths {
 		for _, ext := range extensions {
-			if filepath.Base(hsFile) == baseName+ext {
-				cmd := exec.Command("cabal", "run", "--", hsFile)
+			if filepath.Base(hsFilePath) == cmdBase+ext {
+				cmd := exec.Command("cabal", "run", "--", hsFilePath)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
-				err := cmd.Run()
-				if err != nil && err.(*exec.ExitError) != nil {
-					return err
-				}
-				os.Exit(cmd.ProcessState.ExitCode())
+				return cmd.Run()
 			}
 		}
 	}
-	return errors.New("file not found")
+	return errors.New(fmt.Sprintf("no matching hs file found: %s", args[0]))
 }
 
 var cabalCmd = sync.OnceValues(func() (cabalPath string, err error) {
 	defer Catch(&err)
-	cabalPath = Ensure(exec.LookPath("cabal"))
-	if err == nil {
-		return cabalPath, nil
-	}
-	return "", errors.New("cabal command not found")
+	return V(exec.LookPath("cabal")), nil
 })
 
-func newCabalScriptManager(dir string) common.Manager {
-	if _, err := cabalCmd(); err != nil {
+func newCabalScriptManager(dirPath string) common.Manager {
+	cabalCmd_, err := cabalCmd()
+	if err != nil {
 		return nil
 	}
-	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
-		return nil
-	}
-	var matches []string
+	var matchedPaths []string
 	for _, ext := range extensions {
-		matches = append(matches, Ensure(filepath.Glob(filepath.Join(dir, "*"+ext)))...)
+		matchedPaths = append(matchedPaths, Ensure(filepath.Glob(filepath.Join(dirPath, "*"+ext)))...)
 	}
-	if len(matches) == 0 {
+	if len(matchedPaths) == 0 {
 		return nil
 	}
 	return &CabalScriptManager{
-		files: matches,
+		cabalCmd:  cabalCmd_,
+		filePaths: matchedPaths,
 	}
 }
 

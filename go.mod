@@ -4,7 +4,7 @@ go 1.21.6
 
 require (
 	github.com/h2non/filetype v1.1.3
-	github.com/knaka/go-utils v0.0.2024021526
+	github.com/knaka/go-utils v0.0.2024021544
 	github.com/samber/lo v1.39.0
 	github.com/stretchr/testify v1.8.4
 )

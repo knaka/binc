@@ -6,6 +6,7 @@ import (
 	"hash"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 type NewManagerFn func(dir string) Manager
@@ -17,6 +18,13 @@ type Factory struct {
 
 var factories []*Factory
 
+func Factories() []*Factory {
+	sort.Slice(factories, func(i, j int) bool {
+		return factories[i].PriorityWeight < factories[j].PriorityWeight
+	})
+	return factories
+}
+
 func RegisterManagerFactory(fn NewManagerFn, priorityWeight int) {
 	factories = append(factories, &Factory{
 		PriorityWeight: priorityWeight,
@@ -25,7 +33,7 @@ func RegisterManagerFactory(fn NewManagerFn, priorityWeight int) {
 }
 
 type Manager interface {
-	//Link() ([]string, error)
+	CreateLinks() (err error)
 	CanRun(cmd string) bool
 	Run(args []string) error
 }
@@ -47,10 +55,10 @@ func CacheDir(h hash.Hash) (dir string, err error) {
 	return dir, nil
 }
 
-func CacheFile(h hash.Hash) (cacheFile string, err error) {
+func CacheFile(h hash.Hash, base string) (cacheFile string, err error) {
 	cacheFile = filepath.Join(
 		Ensure(CacheDir(h)),
-		"exe",
+		base,
 	)
 	return
 }
@@ -75,5 +83,5 @@ func LinksDir() (path string, err error) {
 	defer Catch(&err)
 	path = filepath.Join(homeDir, ".binc")
 	Ensure0(os.MkdirAll(path, 0755))
-	return path, nil
+	return
 }

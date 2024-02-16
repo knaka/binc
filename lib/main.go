@@ -8,14 +8,32 @@ import (
 	"github.com/knaka/binc/lib/common"
 	_ "github.com/knaka/binc/lib/golang"
 	. "github.com/knaka/go-utils"
+	"github.com/samber/lo"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 func createLinks() (err error) {
 	defer Catch(&err)
+
+	bincPath := os.Getenv("BINCPATH")
+	bincDirs := lo.Filter(strings.Split(bincPath, ":"), func(dir string, _ int) bool {
+		stat, err := os.Stat(dir)
+		return err == nil && stat.IsDir()
+	})
+
+	for _, factory := range common.Factories() {
+		for _, dir := range bincDirs {
+			manager := factory.NewManager(dir)
+			if manager == nil {
+				continue
+			}
+			V0(manager.CreateLinks())
+		}
+	}
 
 	return nil
 }
@@ -36,37 +54,61 @@ func ensureInstalled(file string) (err error) {
 		return errors.New("not a file")
 	}
 	header := make([]byte, 128)
-	input := R(os.Open(file))
+	input := V(os.Open(file))
 	defer (func() { Ignore(input.Close()) })()
-	R0(input.Read(header))
-	kind := R(filetype.Match(header))
+	V0(input.Read(header))
+	kind := V(filetype.Match(header))
 	if !slices.Contains(binaryTypes, kind) {
 		return errors.New("not an executable binary")
 	}
-	binFile := filepath.Join(R(common.LinksDir()), "binc")
-	binOut := R(os.Create(binFile))
+	binFile := filepath.Join(V(common.LinksDir()), "binc")
+	binOut := V(os.Create(binFile))
 	defer (func() { Ignore(binOut.Close()) })()
-	binIn := R(os.Open(file))
+	binIn := V(os.Open(file))
 	defer (func() { Ignore(binIn.Close()) })()
-	R(io.Copy(binOut, binIn))
-	R0(binOut.Close())
-	R0(os.Chmod(binFile, 0755))
+	_ = V(io.Copy(binOut, binIn))
+	V0(binOut.Close())
+	V0(os.Chmod(binFile, 0755))
 	return nil
 }
 
+func exec(args []string) (err error) {
+	defer Catch(&err)
+	bincPath := os.Getenv("BINCPATH")
+	bincDirs := strings.Split(bincPath, ":")
+	for _, factory := range common.Factories() {
+		for _, dir := range bincDirs {
+			manager := factory.NewManager(dir)
+			if manager == nil {
+				continue
+			}
+			if manager.CanRun(filepath.Base(args[0])) {
+				V0(manager.Run(args))
+				return nil
+			}
+		}
+	}
+	return errors.New("Cannot run " + args[0])
+}
+
+const appName = "binc"
+
 func Main(args []string) (err error) {
 	defer Catch(&err)
-	WaitForDebugger()
-	if filepath.Base(args[0]) == "binc" || filepath.Base(args[0]) == "main" {
-		cmdArgs := args[1:]
-		if len(cmdArgs) == 0 {
-			return createLinks()
-		}
-		switch cmdArgs[0] {
-		case "install":
-			return ensureInstalled(args[0])
-		}
-		return errors.New("unknown command")
+	Debugger()
+	if filepath.Base(args[0]) != appName &&
+		// GoLand run configuration workaround
+		!strings.HasSuffix(args[0], "_"+appName) {
+		return exec(args)
 	}
-	return nil
+	if len(args[1:]) == 0 {
+		return createLinks()
+	}
+	switch args[1] {
+	case "exec":
+		return exec(args[2:])
+	case "install":
+		return ensureInstalled(args[0])
+	}
+	return errors.New("unknown command")
 }

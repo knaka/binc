@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"github.com/samber/lo"
 	"hash"
-	"log"
 	"os"
 	"path/filepath"
 )
@@ -39,7 +38,7 @@ func newBuildInfo(goVersion string, buildArgsWoTgt []string, pkg *string, files 
 		hashAccu.Write([]byte(f.Hash))
 	}
 	// Deep copy the array
-	log.Println("9c0c811", buildArgsWoTgt)
+	//log.Println("9c0c811", buildArgsWoTgt)
 	args := make([]string, len(buildArgsWoTgt))
 	copy(args, buildArgsWoTgt)
 	if pkg != nil {

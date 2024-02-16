@@ -33,7 +33,9 @@ func compileFile(goFile string) (exe string, err error) {
 			Ensure(getGoFileInfo(goFile)),
 		},
 	)
-	exe = Ensure(common.CacheFile(buildInfo.Hash))
+	base := filepath.Base(goFile)
+	baseWithoutExt := base[:len(base)-len(filepath.Ext(base))]
+	exe = Ensure(common.CacheFile(buildInfo.Hash, baseWithoutExt))
 	// If the cache binary is not found, build it.
 	if _, err := os.Stat(exe); err != nil {
 		prevDir := Ensure(os.Getwd())
@@ -53,21 +55,38 @@ func compileFile(goFile string) (exe string, err error) {
 	return exe, nil
 }
 
+func (m *GoFileManager) CreateLinks() (err error) {
+	defer Catch(&err)
+	linksDir := V(common.LinksDir())
+	for _, goFile := range m.files {
+		baseName := filepath.Base(goFile)
+		nameWithoutExt := baseName[:len(baseName)-len(filepath.Ext(baseName))]
+		link := filepath.Join(linksDir, nameWithoutExt)
+		err = os.Remove(link)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		V0(os.Symlink("binc", link))
+	}
+	return nil
+}
+
 func (m *GoFileManager) Run(args []string) (err error) {
 	defer Catch(&err)
 	baseName := filepath.Base(args[0])
 	for _, goFile := range m.files {
 		if filepath.Base(goFile) == baseName+".go" {
 			exe := Ensure(compileFile(goFile))
+			//log.Println("Running:", args, "with", exe)
 			cmd := exec.Command(exe, args[1:]...)
-			cmd.Args[0] = args[0]
+			//cmd.Args[0] = args[0]
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			err := cmd.Run()
 			if err != nil {
 				return err
 			}
-			return nil
+			os.Exit(cmd.ProcessState.ExitCode())
 		}
 	}
 	return errors.New("file not found")
@@ -84,7 +103,7 @@ func (m *GoFileManager) CanRun(cmd string) bool {
 	return false
 }
 
-func newGoFileManager(dir string) *GoFileManager {
+func newGoFileManager(dir string) common.Manager {
 	if _, err := goCmd(); err != nil {
 		return nil
 	}
@@ -103,7 +122,7 @@ func newGoFileManager(dir string) *GoFileManager {
 
 func init() {
 	common.RegisterManagerFactory(
-		func(dir string) common.Manager { return newGoFileManager(dir) },
+		newGoFileManager,
 		100,
 	)
 }

@@ -41,7 +41,8 @@ func TestNewManager(t *testing.T) {
 				t.Errorf("newGoFileManager() = %v, want %v", manager, tt.found)
 			}
 			if manager != nil {
-				assert.Greater(t, len(manager.files), 0)
+				goManager := manager.(*GoFileManager)
+				assert.Greater(t, len(goManager.files), 0)
 			}
 		})
 	}

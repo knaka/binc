@@ -1,0 +1,3 @@
+[submodule "work/go-utils"]
+	path = work/go-utils
+	url = git@github.com:knaka/go-utils.git

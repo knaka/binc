@@ -91,6 +91,7 @@ func (m *GoFileManager) Run(args []string) (err error) {
 		}
 		exePath := V(compile(goFilePath))
 		cmd := exec.Command(exePath, args[1:]...)
+		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
@@ -152,6 +153,7 @@ func (m *GoDirManager) Run(args []string) (err error) {
 		}
 		exePath := V(compile(mainDirPath))
 		cmd := exec.Command(exePath, args[1:]...)
+		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()

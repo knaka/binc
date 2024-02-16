@@ -24,7 +24,7 @@ var extensions = []string{
 
 func (m *CabalScriptManager) CreateLinks() (err error) {
 	defer Catch(&err)
-	linksDir := V(common.LinksDir())
+	linksDir := V(common.LinksDirPath())
 	for _, hsFile := range m.files {
 		baseName := filepath.Base(hsFile)
 		for _, ext := range extensions {
@@ -65,7 +65,7 @@ func (m *CabalScriptManager) Run(args []string) (err error) {
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				err := cmd.Run()
-				if err != nil {
+				if err != nil && err.(*exec.ExitError) != nil {
 					return err
 				}
 				os.Exit(cmd.ProcessState.ExitCode())

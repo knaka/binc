@@ -57,7 +57,7 @@ func compileFile(goFile string) (exe string, err error) {
 
 func (m *GoFileManager) CreateLinks() (err error) {
 	defer Catch(&err)
-	linksDir := V(common.LinksDir())
+	linksDir := V(common.LinksDirPath())
 	for _, goFile := range m.files {
 		baseName := filepath.Base(goFile)
 		nameWithoutExt := baseName[:len(baseName)-len(filepath.Ext(baseName))]

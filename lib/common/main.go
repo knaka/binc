@@ -41,7 +41,7 @@ type Manager interface {
 
 func CacheRootDir() (cacheRootDir string, err error) {
 	defer Catch(&err)
-	cacheRootDir = filepath.Join(Ensure(LinksDir()), ".cache")
+	cacheRootDir = filepath.Join(Ensure(LinksDirPath()), ".cache")
 	Ensure0(os.MkdirAll(cacheRootDir, 0755))
 	return cacheRootDir, nil
 }
@@ -80,7 +80,7 @@ func SetHomeDir(dir string) {
 	homeDir = dir
 }
 
-func LinksDir() (path string, err error) {
+func LinksDirPath() (path string, err error) {
 	defer Catch(&err)
 	path = filepath.Join(homeDir, ".binc")
 	Ensure0(os.MkdirAll(path, 0755))

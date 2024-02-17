@@ -14,24 +14,25 @@ import (
 )
 
 // findGoModFile finds the go.mod file in the given directory or its parents.
-func findGoModFile(modDir string) (string, error) {
-	var err error
+func findGoModFile(initialDirPath string) (goModPath string, err error) {
+	dirPath := initialDirPath
 	for {
-		_, err = os.Stat(filepath.Join(modDir, "go.mod"))
+		goModPath = filepath.Join(dirPath, "go.mod")
+		_, err = os.Stat(goModPath)
 		if err == nil {
-			break
+			return goModPath, nil
 		}
 		if !os.IsNotExist(err) {
 			return "", err
 		}
 		err = nil
-		parent := filepath.Dir(modDir)
-		if parent == modDir {
+		parentDirPath := filepath.Dir(dirPath)
+		if parentDirPath == dirPath {
 			return "", errors.New("go.mod not found")
 		}
-		modDir = parent
+		dirPath = parentDirPath
 	}
-	return filepath.Join(modDir, "go.mod"), nil
+	// unreachable
 }
 
 // GoEnv is a struct to hold the output of `go env -json`.
@@ -85,9 +86,6 @@ func splitArgs(goCmd string, args []string) (runArgs []string, cmdArgs []string,
 			}
 		}
 	}
-	//if len(cmdArgs) > 0 && cmdArgs[0] == "--" {
-	//	cmdArgs = cmdArgs[1:]
-	//}
 	return
 }
 

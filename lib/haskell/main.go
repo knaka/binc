@@ -54,7 +54,7 @@ func (m *CabalScriptManager) Run(args []string, _ bool) (err error) {
 	for _, hsFilePath := range m.filePaths {
 		for _, ext := range extensions {
 			if filepath.Base(hsFilePath) == cmdBase+ext {
-				cmd := exec.Command("cabal", "run", "--", hsFilePath)
+				cmd := exec.Command("cabal", append([]string{"run", hsFilePath}, args[1:]...)...)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				return cmd.Run()

@@ -7,52 +7,51 @@ import (
 	"github.com/knaka/binc/lib/common"
 	. "github.com/knaka/go-utils"
 	"github.com/samber/lo"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
 const goExt = ".go"
 
-func compile(goPath string) (exePath string, err error) {
+func ensureExeFile(goTargetPath string, shouldRebuild bool) (exePath string, err error) {
 	defer Catch(&err)
-	// Due to an inconvenient behavior of filepath.Join(), which removes the trailing dot, this approach is used instead.
-	targetPath := fmt.Sprintf(".%c%s", filepath.Separator, filepath.Base(goPath))
-	buildArgs := []string{"-tags", "", targetPath}
-	var fileInfoList []*FileInfo
+	buildArgsWoTgt := []string{"-tags", ""}
+	var fileInfoList []*common.FileInfo
 	var baseWithoutExt string
-	if stat := V(os.Stat(goPath)); stat.IsDir() {
-		baseWithoutExt = filepath.Base(goPath)
-		files := V(filepath.Glob(filepath.Join(goPath, "*.go")))
+	if stat := V(os.Stat(goTargetPath)); stat.IsDir() {
+		baseWithoutExt = filepath.Base(goTargetPath)
+		files := V(filepath.Glob(filepath.Join(goTargetPath, "*"+goExt)))
 		for _, file := range files {
-			fileInfoList = append(fileInfoList, V(getGoFileInfo(file)))
+			fileInfoList = append(fileInfoList, V(common.GetFileInfo(file)))
 		}
-		sort.Slice(fileInfoList, func(i, j int) bool {
-			if fileInfoList[i].Size == fileInfoList[j].Size {
-				return fileInfoList[i].Hash < fileInfoList[j].Hash
-			}
-			return fileInfoList[i].Size < fileInfoList[j].Size
-		})
 	} else {
-		goFileBase := filepath.Base(goPath)
+		goFileBase := filepath.Base(goTargetPath)
 		baseWithoutExt = goFileBase[:len(goFileBase)-len(filepath.Ext(goFileBase))]
-		fileInfoList = append(fileInfoList, V(getGoFileInfo(goPath)))
+		fileInfoList = append(fileInfoList, V(common.GetFileInfo(goTargetPath)))
 	}
-	buildInfo := newBuildInfoWithFiles(
+	goModFilePath, err := findGoModFile(filepath.Dir(goTargetPath))
+	if err == nil {
+		fileInfoList = append(fileInfoList, V(common.GetFileInfo(goModFilePath)))
+	}
+	buildInfo := common.NewBuildInfo(
 		V(goEnv()).Version,
-		buildArgs,
+		buildArgsWoTgt,
 		fileInfoList,
 	)
 	exePath = V(common.CachedExePath(buildInfo.Hash, baseWithoutExt))
 	// If the cache binary is not found, build it.
-	if _, err := os.Stat(exePath); err != nil {
+	if _, err := os.Stat(exePath); err != nil || shouldRebuild {
 		prevWd := V(os.Getwd())
-		V0(os.Chdir(filepath.Dir(goPath)))
+		V0(os.Chdir(filepath.Dir(goTargetPath)))
 		defer (func() { Ignore(os.Chdir(prevWd)) })()
 		buildCommand := []string{"build"}
 		buildCommand = append(buildCommand, "-o", exePath)
+		// Due to an inconvenient behavior of filepath.Join(), which removes the trailing dot, this approach is used instead.
+		targetPath := fmt.Sprintf(".%c%s", filepath.Separator, filepath.Base(goTargetPath))
+		buildArgs := append(buildArgsWoTgt, targetPath)
 		buildCommand = append(buildCommand, buildArgs...)
 		cmd := exec.Command(V(goCmd()), buildCommand...)
 		cmd.Stdout = os.Stderr
@@ -61,6 +60,7 @@ func compile(goPath string) (exePath string, err error) {
 		V0(os.Chdir(prevWd))
 		buildInfoJson := V(json.Marshal(buildInfo))
 		V0(os.WriteFile(V(common.InfoFilePath(buildInfo.Hash)), buildInfoJson, 0644))
+		log.Println("built:", exePath)
 	}
 	return exePath, nil
 }
@@ -82,14 +82,14 @@ func (m *GoFileManager) GetLinkBases() (linkPaths []string) {
 	return linkPaths
 }
 
-func (m *GoFileManager) Run(args []string) (err error) {
+func (m *GoFileManager) Run(args []string, shouldRebuild bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])
 	for _, goFilePath := range m.goFilePaths {
 		if filepath.Base(goFilePath) != cmdBase+goExt {
 			continue
 		}
-		exePath := V(compile(goFilePath))
+		exePath := V(ensureExeFile(goFilePath, shouldRebuild))
 		cmd := exec.Command(exePath, args[1:]...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -143,7 +143,7 @@ func (m *GoDirManager) CanRun(cmdBase string) bool {
 	return false
 }
 
-func (m *GoDirManager) Run(args []string) (err error) {
+func (m *GoDirManager) Run(args []string, shouldRebuild bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])
 	//goland:noinspection GoDeferInLoop
@@ -151,7 +151,7 @@ func (m *GoDirManager) Run(args []string) (err error) {
 		if filepath.Base(mainDirPath) != cmdBase {
 			continue
 		}
-		exePath := V(compile(mainDirPath))
+		exePath := V(ensureExeFile(mainDirPath, shouldRebuild))
 		cmd := exec.Command(exePath, args[1:]...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout

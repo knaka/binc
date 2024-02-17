@@ -83,9 +83,9 @@ func TestCanRun(t *testing.T) {
 func TestCompile(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), "home")
 	common.SetHomeDirPath(homeDir)
-	exe := Ensure(compile(filepath.Join("testdata", "prj", "cmd", "say_hello.go")))
+	exe := Ensure(ensureExeFile(filepath.Join("testdata", "prj", "cmd", "say_hello.go"), false))
 	cmd := exec.Command(exe)
-	assert.Contains(t, exe, "9be1eee6810e15186d5e5fde0b6de2a784fce948")
+	assert.Contains(t, exe, "f8391da")
 	output := Ensure(cmd.Output())
 	assert.Contains(t, string(output), "Hello, World!")
 }
@@ -94,5 +94,5 @@ func TestRun(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), "home")
 	common.SetHomeDirPath(homeDir)
 	manager := newGoFileManager(filepath.Join("testdata", "prj", "cmd"))
-	Ensure0(manager.Run([]string{filepath.Join("foo", "say_hello"), "foo", "bar"}))
+	Ensure0(manager.Run([]string{filepath.Join("foo", "say_hello"), "foo", "bar"}, false))
 }

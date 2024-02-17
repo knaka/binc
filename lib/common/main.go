@@ -36,7 +36,7 @@ func RegisterManagerFactory(fn NewManagerFn, priorityWeight int) {
 type Manager interface {
 	GetLinkBases() []string
 	CanRun(cmdBase string) bool
-	Run(args []string) error
+	Run(args []string, shouldRebuild bool) error
 }
 
 func CacheRootDirPath() (cacheRootDirPath string, err error) {
@@ -50,7 +50,7 @@ func CacheDirPath(h hash.Hash) (dir string, err error) {
 	defer Catch(&err)
 	dir = filepath.Join(
 		Ensure(CacheRootDirPath()),
-		hex.EncodeToString(h.Sum(nil)),
+		hex.EncodeToString(h.Sum(nil))[0:hashNumDig],
 	)
 	Ensure0(os.MkdirAll(dir, 0755))
 	return dir, nil
@@ -68,7 +68,7 @@ func InfoFilePath(h hash.Hash) (infoFile string, err error) {
 	defer Catch(&err)
 	infoFile = filepath.Join(
 		Ensure(CacheDirPath(h)),
-		"info.json",
+		".info.json",
 	)
 	return infoFile, err
 }

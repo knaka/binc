@@ -48,7 +48,7 @@ func (m *CabalScriptManager) CanRun(cmdBase string) bool {
 	return false
 }
 
-func (m *CabalScriptManager) Run(args []string) (err error) {
+func (m *CabalScriptManager) Run(args []string, _ bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])
 	for _, hsFilePath := range m.filePaths {

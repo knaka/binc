@@ -87,14 +87,14 @@ func recreateLinks() (err error) {
 	)
 }
 
-func execute(args []string) (err error) {
+func execute(args []string, shouldRebuild bool) (err error) {
 	return iterateOverManagers(
 		func(manager common.Manager) (err error) {
 			defer Catch(&err)
 			if !manager.CanRun(filepath.Base(args[0])) {
 				return nil
 			}
-			err = manager.Run(args)
+			err = manager.Run(args, shouldRebuild)
 			if err != nil {
 				var exitError *exec.ExitError
 				if errors.As(err, &exitError) {
@@ -148,11 +148,12 @@ func install(path string) (err error) {
 func Main(args []string) (err error) {
 	defer Catch(&err)
 	Debugger()
+	shouldRebuild := os.Getenv("BUILD") != "" || os.Getenv("REBUILD") != ""
 	if filepath.Base(args[0]) != appBase &&
 		// GoLand run configuration workaround
 		!strings.HasSuffix(args[0], "_"+appBase) {
 		commandArgs := args
-		return execute(commandArgs)
+		return execute(commandArgs, shouldRebuild)
 	}
 	if len(args[1:]) == 0 {
 		return recreateLinks()
@@ -160,7 +161,7 @@ func Main(args []string) (err error) {
 	switch args[1] {
 	case "exec", "execute":
 		commandArgs := args[2:]
-		return execute(commandArgs)
+		return execute(commandArgs, shouldRebuild)
 	case "install":
 		return install(args[0])
 	}

@@ -66,16 +66,22 @@ func recreateLinks() (err error) {
 		}
 		V0(os.Remove(linkPath))
 	}
+	theMap := map[string]string{}
 	// Then create links.
 	return iterateOverManagers(
 		func(manager common.Manager) (err error) {
 			defer Catch(&err)
-			for _, linkBase := range manager.GetLinkBases() {
-				if linkBase == appBase {
+			for _, commandBaseInfo := range manager.GetCommandBaseInfoList() {
+				if commandBaseInfo.CmdBase == appBase {
 					continue
 				}
-				linkPath := filepath.Join(linksDirPath, linkBase)
-				err = os.Remove(linkPath)
+				linkPath := filepath.Join(linksDirPath, commandBaseInfo.CmdBase)
+				if _, err := os.Lstat(linkPath); err == nil {
+					println("Conflicting source:", commandBaseInfo.SourcePath)
+					println("Previous source that will be active:", theMap[commandBaseInfo.CmdBase])
+					continue
+				}
+				theMap[commandBaseInfo.CmdBase] = commandBaseInfo.SourcePath
 				if err != nil && !os.IsNotExist(err) {
 					return err
 				}

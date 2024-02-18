@@ -73,13 +73,16 @@ type GoFileManager struct {
 
 var _ common.Manager = &GoFileManager{}
 
-func (m *GoFileManager) GetLinkBases() (linkPaths []string) {
-	linkPaths = make([]string, len(m.goFilePaths))
-	for i, goFilePath := range m.goFilePaths {
+func (m *GoFileManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
+	for _, goFilePath := range m.goFilePaths {
 		goFileBase := filepath.Base(goFilePath)
-		linkPaths[i] = goFileBase[:len(goFileBase)-len(filepath.Ext(goFileBase))]
+		cmdBase := goFileBase[:len(goFileBase)-len(filepath.Ext(goFileBase))]
+		infoList = append(infoList, &common.CommandBaseInfo{
+			CmdBase:    cmdBase,
+			SourcePath: goFilePath,
+		})
 	}
-	return linkPaths
+	return infoList
 }
 
 func (m *GoFileManager) Run(args []string, shouldRebuild bool) (err error) {
@@ -161,12 +164,14 @@ func (m *GoDirManager) Run(args []string, shouldRebuild bool) (err error) {
 	return errors.New(fmt.Sprintf("no matching go main directory found: %s", args[0]))
 }
 
-func (m *GoDirManager) GetLinkBases() (linkPaths []string) {
-	linkPaths = make([]string, len(m.mainDirPaths))
-	for i, mainDirPath := range m.mainDirPaths {
-		linkPaths[i] = filepath.Base(mainDirPath)
+func (m *GoDirManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
+	for _, mainDirPath := range m.mainDirPaths {
+		infoList = append(infoList, &common.CommandBaseInfo{
+			CmdBase:    filepath.Base(mainDirPath),
+			SourcePath: mainDirPath,
+		})
 	}
-	return linkPaths
+	return infoList
 }
 
 func newGoDirManager(dirPath string) common.Manager {
@@ -198,10 +203,12 @@ func newGoDirManager(dirPath string) common.Manager {
 
 func init() {
 	common.RegisterManagerFactory(
+		"Go File Manager",
 		newGoFileManager,
 		100,
 	)
 	common.RegisterManagerFactory(
+		"Go Dir Manager",
 		newGoDirManager,
 		100,
 	)

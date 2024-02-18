@@ -36,7 +36,7 @@ func GetFileInfo(filePath string) (fileInfo *FileInfo, err error) {
 	if stat.IsDir() {
 		return nil, errors.New("not a file")
 	}
-	hash_, err := (func() (hash.Hash, error) {
+	h, err := (func() (hash.Hash, error) {
 		hash_ := sha1.New()
 		reader, err := os.Open(filePath)
 		if err != nil {
@@ -54,10 +54,14 @@ func GetFileInfo(filePath string) (fileInfo *FileInfo, err error) {
 	}
 	return &FileInfo{
 		Name:    filePath,
-		Hash:    hash_,
-		HashStr: hex.EncodeToString(hash_.Sum(nil))[:hashNumDig],
+		Hash:    h,
+		HashStr: hashStr(h),
 		Size:    stat.Size(),
 	}, nil
+}
+
+func hashStr(h hash.Hash) (hashStr string) {
+	return hex.EncodeToString(h.Sum(nil))[:hashNumDig]
 }
 
 func NewBuildInfo(
@@ -86,6 +90,6 @@ func NewBuildInfo(
 			return f.Name + ":" + f.HashStr
 		}),
 		Hash:    hashOut,
-		HashStr: hex.EncodeToString(hashOut.Sum(nil))[0:hashNumDig],
+		HashStr: hashStr(hashOut),
 	}
 }

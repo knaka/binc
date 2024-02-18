@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/hex"
 	. "github.com/knaka/go-utils"
 	"hash"
 	"os"
@@ -12,6 +11,7 @@ import (
 type NewManagerFn func(dirPath string) Manager
 
 type Factory struct {
+	Name           string
 	PriorityWeight int
 	NewManager     NewManagerFn
 }
@@ -26,15 +26,21 @@ func Factories() []*Factory {
 	return factories
 }
 
-func RegisterManagerFactory(fn NewManagerFn, priorityWeight int) {
+func RegisterManagerFactory(name string, fn NewManagerFn, priorityWeight int) {
 	factories = append(factories, &Factory{
+		Name:           name,
 		PriorityWeight: priorityWeight,
 		NewManager:     fn,
 	})
 }
 
+type CommandBaseInfo struct {
+	CmdBase    string
+	SourcePath string
+}
+
 type Manager interface {
-	GetLinkBases() []string
+	GetCommandBaseInfoList() []*CommandBaseInfo
 	CanRun(cmdBase string) bool
 	Run(args []string, shouldRebuild bool) error
 }
@@ -50,7 +56,7 @@ func CacheDirPath(h hash.Hash) (dir string, err error) {
 	defer Catch(&err)
 	dir = filepath.Join(
 		Ensure(CacheRootDirPath()),
-		hex.EncodeToString(h.Sum(nil))[0:hashNumDig],
+		hashStr(h),
 	)
 	Ensure0(os.MkdirAll(dir, 0755))
 	return dir, nil

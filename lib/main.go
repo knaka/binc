@@ -19,6 +19,7 @@ import (
 	// Load all the language managers.
 	_ "github.com/knaka/binc/lib/golang"
 	_ "github.com/knaka/binc/lib/haskell"
+	_ "github.com/knaka/binc/lib/java"
 )
 
 const appBase = "binc"

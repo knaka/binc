@@ -20,6 +20,7 @@ import (
 	_ "github.com/knaka/binc/lib/golang"
 	_ "github.com/knaka/binc/lib/haskell"
 	_ "github.com/knaka/binc/lib/java"
+	_ "github.com/knaka/binc/lib/scala"
 )
 
 const appBase = "binc"

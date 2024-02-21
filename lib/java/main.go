@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 )
@@ -27,40 +26,13 @@ var extensions = []string{
 	".java",
 }
 
-var reEachCamel = sync.OnceValue(func() *regexp.Regexp {
-	return regexp.MustCompile(`([A-Z][a-z0-9]*)`)
-})
-
-func camel2Kebab(sIn string) (s string) {
-	s = sIn
-	s = reEachCamel().ReplaceAllStringFunc(s, func(s string) string {
-		return "-" + strings.ToLower(s)
-	})
-	s = strings.TrimPrefix(s, "-")
-	return s
-}
-
-var reEachKebab = sync.OnceValue(func() *regexp.Regexp {
-	return regexp.MustCompile(`-([a-z0-9])`)
-})
-
-func kebab2Camel(sIn string) (s string) {
-	s = "-" + sIn
-	s = reEachKebab().ReplaceAllStringFunc(s, func(s string) string {
-		return strings.ToUpper(s[1:2]) + s[2:]
-	})
-	s = strings.TrimPrefix(s, "-")
-	return s
-
-}
-
 func (m *JavaClassManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
 	for _, javaFilePath := range m.filePaths {
 		javaFileBase := filepath.Base(javaFilePath)
 		for _, ext := range extensions {
 			if strings.HasSuffix(javaFileBase, ext) {
 				infoList = append(infoList, &common.CommandBaseInfo{
-					CmdBase:    camel2Kebab(javaFileBase[:len(javaFileBase)-len(ext)]),
+					CmdBase:    common.Camel2Kebab(javaFileBase[:len(javaFileBase)-len(ext)]),
 					SourcePath: javaFilePath,
 				})
 			}
@@ -72,7 +44,7 @@ func (m *JavaClassManager) GetCommandBaseInfoList() (infoList []*common.CommandB
 func (m *JavaClassManager) CanRun(cmdBase string) bool {
 	for _, hsFilePath := range m.filePaths {
 		for _, ext := range extensions {
-			if filepath.Base(hsFilePath) == kebab2Camel(cmdBase)+ext {
+			if filepath.Base(hsFilePath) == common.Kebab2Camel(cmdBase)+ext {
 				return true
 			}
 		}
@@ -88,7 +60,7 @@ func ensureClassFile(javaFilePath string, cmdBase string, shouldRebuild bool) (c
 		nil, // Any arguments?
 		fileInfoList,
 	)
-	classFilePath = V(common.CachedExePath(buildInfo.Hash, kebab2Camel(cmdBase)+".class"))
+	classFilePath = V(common.CachedExePath(buildInfo.Hash, common.Kebab2Camel(cmdBase)+".class"))
 	if _, err = os.Stat(classFilePath); err != nil || shouldRebuild {
 		V0(os.MkdirAll(filepath.Dir(classFilePath), 0755))
 		cmd := exec.Command(V(javacCommand()), "-d", filepath.Dir(classFilePath), javaFilePath)
@@ -107,10 +79,10 @@ func (m *JavaClassManager) Run(args []string, shouldRebuild bool) (err error) {
 	cmdBase := filepath.Base(args[0])
 	for _, javaFilePath := range m.filePaths {
 		for _, ext := range extensions {
-			if filepath.Base(javaFilePath) == kebab2Camel(cmdBase)+ext {
+			if filepath.Base(javaFilePath) == common.Kebab2Camel(cmdBase)+ext {
 				classFilePath := V(ensureClassFile(javaFilePath, cmdBase, shouldRebuild))
 				classDir := filepath.Dir(classFilePath)
-				classBase := kebab2Camel(cmdBase)
+				classBase := common.Kebab2Camel(cmdBase)
 				cmd := exec.Command(m.javaCmd, append([]string{"-cp", classDir, classBase}, args[1:]...)...)
 				cmd.Stdin = os.Stdin
 				cmd.Stdout = os.Stdout

@@ -67,13 +67,13 @@ func ensureExeFile(goTargetPath string, shouldRebuild bool) (exePath string, err
 
 // --------
 
-type GoFileManager struct {
+type GoMainFileManager struct {
 	goFilePaths []string
 }
 
-var _ common.Manager = &GoFileManager{}
+var _ common.Manager = &GoMainFileManager{}
 
-func (m *GoFileManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
+func (m *GoMainFileManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
 	for _, goFilePath := range m.goFilePaths {
 		goFileBase := filepath.Base(goFilePath)
 		cmdBase := goFileBase[:len(goFileBase)-len(filepath.Ext(goFileBase))]
@@ -85,7 +85,7 @@ func (m *GoFileManager) GetCommandBaseInfoList() (infoList []*common.CommandBase
 	return infoList
 }
 
-func (m *GoFileManager) Run(args []string, shouldRebuild bool) (err error) {
+func (m *GoMainFileManager) Run(args []string, shouldRebuild bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])
 	for _, goFilePath := range m.goFilePaths {
@@ -103,7 +103,7 @@ func (m *GoFileManager) Run(args []string, shouldRebuild bool) (err error) {
 }
 
 // CanRun checks if the command can be run by this manager.
-func (m *GoFileManager) CanRun(cmdBase string) bool {
+func (m *GoMainFileManager) CanRun(cmdBase string) bool {
 	for _, goFilePath := range m.goFilePaths {
 		if filepath.Base(goFilePath) == cmdBase+goExt {
 			return true
@@ -112,7 +112,7 @@ func (m *GoFileManager) CanRun(cmdBase string) bool {
 	return false
 }
 
-func newGoFileManager(dirPath string) common.Manager {
+func newGoMainFileManager(dirPath string) common.Manager {
 	if _, err := goCmd(); err != nil {
 		return nil
 	}
@@ -124,20 +124,20 @@ func newGoFileManager(dirPath string) common.Manager {
 	if len(matchedPaths) == 0 {
 		return nil
 	}
-	return &GoFileManager{
+	return &GoMainFileManager{
 		goFilePaths: matchedPaths,
 	}
 }
 
 // --------
 
-type GoDirManager struct {
+type GoMainPackageManager struct {
 	mainDirPaths []string
 }
 
-var _ common.Manager = &GoDirManager{}
+var _ common.Manager = &GoMainPackageManager{}
 
-func (m *GoDirManager) CanRun(cmdBase string) bool {
+func (m *GoMainPackageManager) CanRun(cmdBase string) bool {
 	for _, mainDirPath := range m.mainDirPaths {
 		if filepath.Base(mainDirPath) == cmdBase {
 			return true
@@ -146,7 +146,7 @@ func (m *GoDirManager) CanRun(cmdBase string) bool {
 	return false
 }
 
-func (m *GoDirManager) Run(args []string, shouldRebuild bool) (err error) {
+func (m *GoMainPackageManager) Run(args []string, shouldRebuild bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])
 	//goland:noinspection GoDeferInLoop
@@ -164,7 +164,7 @@ func (m *GoDirManager) Run(args []string, shouldRebuild bool) (err error) {
 	return errors.New(fmt.Sprintf("no matching go main directory found: %s", args[0]))
 }
 
-func (m *GoDirManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
+func (m *GoMainPackageManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
 	for _, mainDirPath := range m.mainDirPaths {
 		infoList = append(infoList, &common.CommandBaseInfo{
 			CmdBase:    filepath.Base(mainDirPath),
@@ -174,7 +174,7 @@ func (m *GoDirManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseI
 	return infoList
 }
 
-func newGoDirManager(dirPath string) common.Manager {
+func newGoMainPackageManager(dirPath string) common.Manager {
 	if _, err := goCmd(); err != nil {
 		return nil
 	}
@@ -194,7 +194,7 @@ func newGoDirManager(dirPath string) common.Manager {
 		}
 		goMainDirPaths = append(goMainDirPaths, mainDirPath)
 	}
-	return &GoDirManager{
+	return &GoMainPackageManager{
 		mainDirPaths: goMainDirPaths,
 	}
 }
@@ -203,13 +203,13 @@ func newGoDirManager(dirPath string) common.Manager {
 
 func init() {
 	common.RegisterManagerFactory(
-		"Go File Manager",
-		newGoFileManager,
+		"Go Main File Manager",
+		newGoMainFileManager,
 		100,
 	)
 	common.RegisterManagerFactory(
-		"Go Dir Manager",
-		newGoDirManager,
+		"Go Main Package Manager",
+		newGoMainPackageManager,
 		100,
 	)
 }

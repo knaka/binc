@@ -36,12 +36,12 @@ func TestNewManager(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := newGoFileManager(tt.dir)
+			manager := newGoMainFileManager(tt.dir)
 			if (manager != nil) != tt.found {
-				t.Errorf("newGoFileManager() = %v, want %v", manager, tt.found)
+				t.Errorf("newGoMainFileManager() = %v, want %v", manager, tt.found)
 			}
 			if manager != nil {
-				goManager := manager.(*GoFileManager)
+				goManager := manager.(*GoMainFileManager)
 				assert.Greater(t, len(goManager.goFilePaths), 0)
 			}
 		})
@@ -49,7 +49,7 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestCanRun(t *testing.T) {
-	manager := newGoFileManager(filepath.Join("testdata", "prj", "cmd"))
+	manager := newGoMainFileManager(filepath.Join("testdata", "prj", "cmd"))
 	type args struct {
 		cmd string
 	}
@@ -93,6 +93,6 @@ func TestCompile(t *testing.T) {
 func TestRun(t *testing.T) {
 	homeDir := filepath.Join(t.TempDir(), "home")
 	common.SetHomeDirPath(homeDir)
-	manager := newGoFileManager(filepath.Join("testdata", "prj", "cmd"))
+	manager := newGoMainFileManager(filepath.Join("testdata", "prj", "cmd"))
 	Ensure0(manager.Run([]string{filepath.Join("foo", "say_hello"), "foo", "bar"}, false))
 }

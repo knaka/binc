@@ -54,6 +54,18 @@ func iterateOverManagers(
 	return lastError
 }
 
+func which(cmdBase string) (err error) {
+	return iterateOverManagers(func(manager common.Manager) (err error) {
+		for _, commandBaseInfo := range manager.GetCommandBaseInfoList() {
+			if commandBaseInfo.CmdBase == cmdBase {
+				fmt.Println(commandBaseInfo.SourcePath)
+				return nil
+			}
+		}
+		return nil
+	}, nil)
+}
+
 func recreateLinks() (err error) {
 	defer Catch(&err)
 	linksDirPath := V(common.LinksDirPath())
@@ -172,6 +184,8 @@ func Main(args []string) (err error) {
 		return execute(commandArgs, shouldRebuild)
 	case "install":
 		return install(args[0])
+	case "which":
+		return which(args[2])
 	}
 	return errors.New(fmt.Sprintf("unknown command: %s", args[1]))
 }

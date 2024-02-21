@@ -1,11 +1,13 @@
 package haskell
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/knaka/binc/lib/common"
 	. "github.com/knaka/go-utils"
+	"github.com/samber/lo"
 	"log"
 	"os"
 	"os/exec"
@@ -15,26 +17,41 @@ import (
 )
 
 type CabalScriptManager struct {
-	cabalCmd  string
-	filePaths []string
+	exeLikePaths []string
 }
 
 var _ common.Manager = &CabalScriptManager{}
 
+// Sort in descending order of length.
 var extensions = []string{
-	".cabal.hs",
 	".cabal.lhs",
+	".cabal.hs",
+	".lhs",
+	".hs",
 }
 
 func (m *CabalScriptManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
-	for _, hsFilePath := range m.filePaths {
-		hsFileBase := filepath.Base(hsFilePath)
-		for _, ext := range extensions {
-			if strings.HasSuffix(hsFileBase, ext) {
-				infoList = append(infoList, &common.CommandBaseInfo{
-					CmdBase:    hsFileBase[:len(hsFileBase)-len(ext)],
-					SourcePath: hsFilePath,
-				})
+outer:
+	for _, exeLikePath := range m.exeLikePaths {
+		exeLikeBase := filepath.Base(exeLikePath)
+		stat, err := os.Stat(exeLikePath)
+		if err != nil {
+			continue
+		}
+		if stat.IsDir() {
+			infoList = append(infoList, &common.CommandBaseInfo{
+				CmdBase:    exeLikeBase,
+				SourcePath: exeLikePath,
+			})
+		} else {
+			for _, ext := range extensions {
+				if strings.HasSuffix(exeLikeBase, ext) {
+					infoList = append(infoList, &common.CommandBaseInfo{
+						CmdBase:    common.Camel2Kebab(exeLikeBase[:len(exeLikeBase)-len(ext)]),
+						SourcePath: exeLikePath,
+					})
+					continue outer
+				}
 			}
 		}
 	}
@@ -42,10 +59,24 @@ func (m *CabalScriptManager) GetCommandBaseInfoList() (infoList []*common.Comman
 }
 
 func (m *CabalScriptManager) CanRun(cmdBase string) bool {
-	for _, hsFilePath := range m.filePaths {
-		for _, ext := range extensions {
-			if filepath.Base(hsFilePath) == cmdBase+ext {
+	for _, exeLikePath := range m.exeLikePaths {
+		exeLikeBase := filepath.Base(exeLikePath)
+		stat, err := os.Stat(exeLikePath)
+		if err != nil {
+			continue
+		}
+		if stat.IsDir() {
+			if filepath.Base(exeLikePath) == cmdBase {
 				return true
+			}
+		} else {
+			for _, ext := range extensions {
+				if strings.HasSuffix(exeLikeBase, ext) {
+					if exeLikeBase == cmdBase+ext ||
+						common.Camel2Kebab(exeLikeBase[:len(exeLikeBase)-len(ext)]) == cmdBase {
+						return true
+					}
+				}
 			}
 		}
 	}
@@ -82,19 +113,103 @@ func ensureExeFile(hsFilePath string, cmdBase string, shouldRebuild bool) (exePa
 	return exePath, nil
 }
 
+func containsCabalScriptBlockStartMarker(hsFilePath string) bool {
+	in := V(os.Open(hsFilePath))
+	defer func() { V0(in.Close()) }()
+	buf := make([]byte, 1024)
+	n := V(in.Read(buf))
+	return strings.Contains(string(buf[:n]), "{- cabal:")
+}
+
+func findCabalFile(exeLikePath string) (cabalFile string, err error) {
+	defer Catch(&err)
+	dirPathPrev := exeLikePath
+	dirPath := filepath.Dir(exeLikePath)
+	for dirPath != dirPathPrev {
+		cabalFiles := Ensure(filepath.Glob(filepath.Join(dirPath, "*.cabal")))
+		if len(cabalFiles) > 0 {
+			return cabalFiles[0], nil
+		}
+		dirPathPrev = dirPath
+		dirPath = filepath.Dir(dirPath)
+	}
+	return "", errors.New("no cabal file found")
+}
+
+func build(cabalFilePath string, cmdBase string) (exePath string, err error) {
+	defer Catch(&err)
+	cabalFileDir := filepath.Dir(cabalFilePath)
+	wd := V(os.Getwd())
+	defer (func() { Ignore(os.Chdir(wd)) })()
+	V0(os.Chdir(cabalFileDir))
+	cmd := exec.Command(V(cabalCmd()), "build", cmdBase)
+	readCloser := V(cmd.StdoutPipe())
+	defer (func() { Ignore(readCloser.Close()) })()
+	go (func() {
+		scanner := bufio.NewScanner(readCloser)
+		for {
+			if !scanner.Scan() {
+				break
+			}
+			txt := scanner.Text()
+			if !strings.Contains(txt, "Up to date") {
+				Ignore(os.Stderr.Write([]byte(txt + "\n")))
+			}
+		}
+	})()
+	cmd.Stderr = os.Stderr
+	V0(cmd.Run())
+	cmd = exec.Command(V(cabalCmd()), "list-bin", cmdBase)
+	bufExePath := V(cmd.Output())
+	builtExePath := strings.TrimSpace(string(bufExePath))
+	V0(os.Chdir(wd))
+	return builtExePath, nil
+}
+
+//goland:noinspection GoDeferInLoop
 func (m *CabalScriptManager) Run(args []string, shouldRebuild bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])
-	for _, hsFilePath := range m.filePaths {
-		for _, ext := range extensions {
-			if filepath.Base(hsFilePath) == cmdBase+ext {
-				//cmd := exec.Command(m.cabalCmd, append([]string{"run", hsFilePath}, args[1:]...)...)
-				exePath := V(ensureExeFile(hsFilePath, cmdBase, shouldRebuild))
-				cmd := exec.Command(exePath, args[1:]...)
-				cmd.Stdin = os.Stdin
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				return cmd.Run()
+	for _, exeLikePath := range m.exeLikePaths {
+		exeLikeBase := filepath.Base(exeLikePath)
+		stat, err := os.Stat(exeLikePath)
+		if err != nil {
+			continue
+		}
+		if stat.IsDir() {
+			if filepath.Base(exeLikePath) == cmdBase {
+				if cabalFilePath, err := findCabalFile(exeLikePath); err == nil {
+					builtExtPath := V(build(cabalFilePath, cmdBase))
+					cmd := exec.Command(builtExtPath, args[1:]...)
+					cmd.Stdin = os.Stdin
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					return cmd.Run()
+				} else {
+					return errors.New("no matching cabal target found")
+				}
+			}
+		} else {
+			for _, ext := range extensions {
+				if exeLikeBase == cmdBase+ext ||
+					exeLikeBase == common.Kebab2Camel(cmdBase)+ext {
+					if containsCabalScriptBlockStartMarker(exeLikePath) {
+						cmd := exec.Command(V(cabalCmd()), append([]string{"run", exeLikePath}, args[1:]...)...)
+						cmd.Stdin = os.Stdin
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+						return cmd.Run()
+					} else if cabalFilePath, err := findCabalFile(exeLikePath); err == nil {
+						builtExePath := V(build(cabalFilePath, cmdBase))
+						cmd := exec.Command(builtExePath, args[1:]...)
+						cmd.Stdin = os.Stdin
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+						return cmd.Run()
+					} else {
+						return errors.New("no matching cabal target found")
+					}
+				}
 			}
 		}
 	}
@@ -107,26 +222,38 @@ var cabalCmd = sync.OnceValues(func() (cabalPath string, err error) {
 })
 
 func newCabalScriptManager(dirPath string) common.Manager {
-	cabalCmd_, err := cabalCmd()
-	if err != nil {
+	if E(cabalCmd()) != nil {
 		return nil
 	}
-	var matchedPaths []string
-	for _, ext := range extensions {
-		matchedPaths = append(matchedPaths, Ensure(filepath.Glob(filepath.Join(dirPath, "*"+ext)))...)
+	var exeLikePaths []string
+	for _, dirEntry := range V(os.ReadDir(dirPath)) {
+		if !dirEntry.IsDir() {
+			continue
+		}
+		hsFiles := V(filepath.Glob(filepath.Join(dirPath, dirEntry.Name(), "*.hs")))
+		if len(hsFiles) > 0 {
+			exeLikePaths = append(exeLikePaths, filepath.Join(dirPath, dirEntry.Name()))
+		}
 	}
-	if len(matchedPaths) == 0 {
+	for _, ext := range extensions {
+		exeLikePaths = append(exeLikePaths, V(filepath.Glob(filepath.Join(dirPath, "*"+ext)))...)
+	}
+	exeLikePaths = lo.FindUniques(exeLikePaths)
+	exeLikePaths = lo.Filter(exeLikePaths, func(hsFilePath string, _ int) bool {
+		return !strings.HasPrefix(filepath.Base(hsFilePath), ".") &&
+			!strings.HasPrefix(filepath.Base(hsFilePath), "_")
+	})
+	if len(exeLikePaths) == 0 {
 		return nil
 	}
 	return &CabalScriptManager{
-		cabalCmd:  cabalCmd_,
-		filePaths: matchedPaths,
+		exeLikePaths: exeLikePaths,
 	}
 }
 
 func init() {
 	common.RegisterManagerFactory(
-		"Cabal Script Manager",
+		"Cabal Executable-likes Manager",
 		newCabalScriptManager,
 		50,
 	)

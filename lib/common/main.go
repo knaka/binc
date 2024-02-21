@@ -5,7 +5,10 @@ import (
 	"hash"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strings"
+	"sync"
 )
 
 type NewManagerFn func(dirPath string) Manager
@@ -91,4 +94,31 @@ func LinksDirPath() (path string, err error) {
 	path = filepath.Join(homeDirPath, ".binc")
 	Ensure0(os.MkdirAll(path, 0755))
 	return
+}
+
+var reEachCamel = sync.OnceValue(func() *regexp.Regexp {
+	return regexp.MustCompile(`([A-Z][a-z0-9]*)`)
+})
+
+func Camel2Kebab(sIn string) (s string) {
+	s = sIn
+	s = reEachCamel().ReplaceAllStringFunc(s, func(s string) string {
+		return "-" + strings.ToLower(s)
+	})
+	s = strings.TrimPrefix(s, "-")
+	return s
+}
+
+var reEachKebab = sync.OnceValue(func() *regexp.Regexp {
+	return regexp.MustCompile(`-([a-z0-9])`)
+})
+
+func Kebab2Camel(sIn string) (s string) {
+	s = "-" + sIn
+	s = reEachKebab().ReplaceAllStringFunc(s, func(s string) string {
+		return strings.ToUpper(s[1:2]) + s[2:]
+	})
+	s = strings.TrimPrefix(s, "-")
+	return s
+
 }

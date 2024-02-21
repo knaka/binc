@@ -166,7 +166,6 @@ func build(cabalFilePath string, cmdBase string) (exePath string, err error) {
 	return builtExePath, nil
 }
 
-//goland:noinspection GoDeferInLoop
 func (m *CabalScriptManager) Run(args []string, shouldRebuild bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])

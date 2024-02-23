@@ -50,24 +50,24 @@ type Manager interface {
 
 func CacheRootDirPath() (cacheRootDirPath string, err error) {
 	defer Catch(&err)
-	cacheRootDirPath = filepath.Join(Ensure(LinksDirPath()), ".cache")
-	Ensure0(os.MkdirAll(cacheRootDirPath, 0755))
+	cacheRootDirPath = filepath.Join(V(LinksDirPath()), ".cache")
+	V0(os.MkdirAll(cacheRootDirPath, 0755))
 	return cacheRootDirPath, nil
 }
 
 func CacheDirPath(h hash.Hash) (dir string, err error) {
 	defer Catch(&err)
 	dir = filepath.Join(
-		Ensure(CacheRootDirPath()),
+		V(CacheRootDirPath()),
 		hashStr(h),
 	)
-	Ensure0(os.MkdirAll(dir, 0755))
+	V0(os.MkdirAll(dir, 0755))
 	return dir, nil
 }
 
 func CachedExePath(h hash.Hash, base string) (cachedExePath string, err error) {
 	cachedExePath = filepath.Join(
-		Ensure(CacheDirPath(h)),
+		V(CacheDirPath(h)),
 		base,
 	)
 	return
@@ -76,13 +76,13 @@ func CachedExePath(h hash.Hash, base string) (cachedExePath string, err error) {
 func InfoFilePath(h hash.Hash) (infoFile string, err error) {
 	defer Catch(&err)
 	infoFile = filepath.Join(
-		Ensure(CacheDirPath(h)),
+		V(CacheDirPath(h)),
 		".info.json",
 	)
 	return infoFile, err
 }
 
-var homeDirPath = Ensure(os.UserHomeDir())
+var homeDirPath = V(os.UserHomeDir())
 
 // SetHomeDirPath should be available only for testing?
 func SetHomeDirPath(dirPath string) {
@@ -92,7 +92,7 @@ func SetHomeDirPath(dirPath string) {
 func LinksDirPath() (path string, err error) {
 	defer Catch(&err)
 	path = filepath.Join(homeDirPath, ".binc")
-	Ensure0(os.MkdirAll(path, 0755))
+	V0(os.MkdirAll(path, 0755))
 	return
 }
 

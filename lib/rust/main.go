@@ -1,4 +1,4 @@
-package haskell
+package rust
 
 import (
 	"bufio"
@@ -14,21 +14,19 @@ import (
 	"sync"
 )
 
-type CabalScriptManager struct {
+type CargoScriptManager struct {
 	exeLikePaths []string
 }
 
-var _ common.Manager = &CabalScriptManager{}
+var _ common.Manager = &CargoScriptManager{}
 
 // Sort in descending order of length.
 var extensions = []string{
-	".cabal.lhs",
-	".cabal.hs",
-	".lhs",
-	".hs",
+	".cargo.rs",
+	".rs",
 }
 
-func (m *CabalScriptManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
+func (m *CargoScriptManager) GetCommandBaseInfoList() (infoList []*common.CommandBaseInfo) {
 outer:
 	for _, exeLikePath := range m.exeLikePaths {
 		exeLikeBase := filepath.Base(exeLikePath)
@@ -45,7 +43,7 @@ outer:
 			for _, ext := range extensions {
 				if strings.HasSuffix(exeLikeBase, ext) {
 					infoList = append(infoList, &common.CommandBaseInfo{
-						CmdBase:    common.Camel2Kebab(exeLikeBase[:len(exeLikeBase)-len(ext)]),
+						CmdBase:    exeLikeBase[:len(exeLikeBase)-len(ext)],
 						SourcePath: exeLikePath,
 					})
 					continue outer
@@ -56,7 +54,7 @@ outer:
 	return infoList
 }
 
-func (m *CabalScriptManager) CanRun(cmdBase string) bool {
+func (m *CargoScriptManager) CanRun(cmdBase string) bool {
 	for _, exeLikePath := range m.exeLikePaths {
 		exeLikeBase := filepath.Base(exeLikePath)
 		stat, err := os.Stat(exeLikePath)
@@ -71,7 +69,7 @@ func (m *CabalScriptManager) CanRun(cmdBase string) bool {
 			for _, ext := range extensions {
 				if strings.HasSuffix(exeLikeBase, ext) {
 					if exeLikeBase == cmdBase+ext ||
-						common.Camel2Kebab(exeLikeBase[:len(exeLikeBase)-len(ext)]) == cmdBase {
+						exeLikeBase[:len(exeLikeBase)-len(ext)] == cmdBase {
 						return true
 					}
 				}
@@ -81,36 +79,36 @@ func (m *CabalScriptManager) CanRun(cmdBase string) bool {
 	return false
 }
 
-func containsCabalScriptBlockStartMarker(hsFilePath string) bool {
-	in := V(os.Open(hsFilePath))
+func containsCargoScriptBlockStartMarker(rsFilePath string) bool {
+	in := V(os.Open(rsFilePath))
 	defer func() { V0(in.Close()) }()
 	buf := make([]byte, 1024)
 	n := V(in.Read(buf))
-	return strings.Contains(string(buf[:n]), "{- cabal:")
+	return strings.Contains(string(buf[:n]), "{- cargo:")
 }
 
-func findCabalFile(exeLikePath string) (cabalFile string, err error) {
+func findCargoFile(exeLikePath string) (cargoFilePath string, err error) {
 	defer Catch(&err)
 	dirPathPrev := exeLikePath
 	dirPath := filepath.Dir(exeLikePath)
 	for dirPath != dirPathPrev {
-		cabalFiles := V(filepath.Glob(filepath.Join(dirPath, "*.cabal")))
-		if len(cabalFiles) > 0 {
-			return cabalFiles[0], nil
+		cargoFilePaths := V(filepath.Glob(filepath.Join(dirPath, "Cargo.toml")))
+		if len(cargoFilePaths) > 0 {
+			return cargoFilePaths[0], nil
 		}
 		dirPathPrev = dirPath
 		dirPath = filepath.Dir(dirPath)
 	}
-	return "", errors.New("no cabal file found")
+	return "", errors.New("no cargo file found")
 }
 
-func build(cabalFilePath string, cmdBase string) (exePath string, err error) {
+func build(cargoFilePath string, cmdBase string) (exePath string, err error) {
 	defer Catch(&err)
-	cabalFileDir := filepath.Dir(cabalFilePath)
+	cargoFileDir := filepath.Dir(cargoFilePath)
 	wd := V(os.Getwd())
 	defer (func() { Ignore(os.Chdir(wd)) })()
-	V0(os.Chdir(cabalFileDir))
-	cmd := exec.Command(V(cabalCmd()), "build", cmdBase)
+	V0(os.Chdir(cargoFileDir))
+	cmd := exec.Command(V(cargoCmd()), "build", cmdBase)
 	readCloser := V(cmd.StdoutPipe())
 	defer (func() { Ignore(readCloser.Close()) })()
 	go (func() {
@@ -127,14 +125,14 @@ func build(cabalFilePath string, cmdBase string) (exePath string, err error) {
 	})()
 	cmd.Stderr = os.Stderr
 	V0(cmd.Run())
-	cmd = exec.Command(V(cabalCmd()), "list-bin", cmdBase)
+	cmd = exec.Command(V(cargoCmd()), "list-bin", cmdBase)
 	bufExePath := V(cmd.Output())
 	builtExePath := strings.TrimSpace(string(bufExePath))
 	V0(os.Chdir(wd))
 	return builtExePath, nil
 }
 
-func (m *CabalScriptManager) Run(args []string, shouldRebuild bool) (err error) {
+func (m *CargoScriptManager) Run(args []string, shouldRebuild bool) (err error) {
 	defer Catch(&err)
 	cmdBase := filepath.Base(args[0])
 	for _, exeLikePath := range m.exeLikePaths {
@@ -145,51 +143,62 @@ func (m *CabalScriptManager) Run(args []string, shouldRebuild bool) (err error) 
 		}
 		if stat.IsDir() {
 			if filepath.Base(exeLikePath) == cmdBase {
-				if cabalFilePath, err := findCabalFile(exeLikePath); err == nil {
-					builtExtPath := V(build(cabalFilePath, cmdBase))
-					cmd := exec.Command(builtExtPath, args[1:]...)
+				if cargoFilePath, err := findCargoFile(exeLikePath); err == nil {
+					cmd := exec.Command(V(cargoCmd()), append([]string{
+						"-Z", "unstable-options",
+						"-C", filepath.Dir(cargoFilePath),
+						"run", "--quiet", "--bin", cmdBase,
+					}, args[1:]...)...)
 					cmd.Stdin = os.Stdin
 					cmd.Stdout = os.Stdout
 					cmd.Stderr = os.Stderr
 					return cmd.Run()
 				} else {
-					return errors.New("no matching cabal target found")
+					return errors.New("no cargo file found")
 				}
 			}
 		} else {
 			for _, ext := range extensions {
-				if exeLikeBase == cmdBase+ext ||
-					exeLikeBase == common.Kebab2Camel(cmdBase)+ext {
-					if containsCabalScriptBlockStartMarker(exeLikePath) {
-						cmd := exec.Command(V(cabalCmd()), append([]string{"run", exeLikePath}, args[1:]...)...)
-						cmd.Stdin = os.Stdin
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-						return cmd.Run()
-					} else if cabalFilePath, err := findCabalFile(exeLikePath); err == nil {
-						builtExePath := V(build(cabalFilePath, cmdBase))
-						cmd := exec.Command(builtExePath, args[1:]...)
+				if exeLikeBase == cmdBase+ext {
+					if cargoFilePath, err := findCargoFile(exeLikePath); err == nil {
+						cmd := exec.Command(V(cargoCmd()), append([]string{
+							"-Z", "unstable-options",
+							"-C", filepath.Dir(cargoFilePath),
+							"run", "--quiet", "--bin", cmdBase,
+						}, args[1:]...)...)
 						cmd.Stdin = os.Stdin
 						cmd.Stdout = os.Stdout
 						cmd.Stderr = os.Stderr
 						return cmd.Run()
 					} else {
-						return errors.New("no matching cabal target found")
+						// cargo +nightly -q -Zscript
+						cmd := exec.Command(V(cargoCmd()), append([]string{
+							"+nightly",
+							"-Z", "script",
+							"--quiet",
+							exeLikePath,
+						}, args[1:]...)...)
+						cmd.Stdin = os.Stdin
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+						return cmd.Run()
+						//} else {
+						//	return errors.New("no matching cargo target found")
 					}
 				}
 			}
 		}
 	}
-	return errors.New(fmt.Sprintf("no matching hs file found: %s", args[0]))
+	return errors.New(fmt.Sprintf("no matching rs file found: %s", args[0]))
 }
 
-var cabalCmd = sync.OnceValues(func() (cabalPath string, err error) {
+var cargoCmd = sync.OnceValues(func() (cargoPath string, err error) {
 	defer Catch(&err)
-	return V(exec.LookPath("cabal")), nil
+	return V(exec.LookPath("cargo")), nil
 })
 
-func newCabalScriptManager(dirPath string) common.Manager {
-	if E(cabalCmd()) != nil {
+func newCargoScriptManager(dirPath string) common.Manager {
+	if E(cargoCmd()) != nil {
 		return nil
 	}
 	var exeLikePaths []string
@@ -197,8 +206,8 @@ func newCabalScriptManager(dirPath string) common.Manager {
 		if !dirEntry.IsDir() {
 			continue
 		}
-		hsFiles := V(filepath.Glob(filepath.Join(dirPath, dirEntry.Name(), "*.hs")))
-		if len(hsFiles) > 0 {
+		rsFiles := V(filepath.Glob(filepath.Join(dirPath, dirEntry.Name(), "*.rs")))
+		if len(rsFiles) > 0 {
 			exeLikePaths = append(exeLikePaths, filepath.Join(dirPath, dirEntry.Name()))
 		}
 	}
@@ -206,22 +215,22 @@ func newCabalScriptManager(dirPath string) common.Manager {
 		exeLikePaths = append(exeLikePaths, V(filepath.Glob(filepath.Join(dirPath, "*"+ext)))...)
 	}
 	exeLikePaths = lo.FindUniques(exeLikePaths)
-	exeLikePaths = lo.Filter(exeLikePaths, func(hsFilePath string, _ int) bool {
-		return !strings.HasPrefix(filepath.Base(hsFilePath), ".") &&
-			!strings.HasPrefix(filepath.Base(hsFilePath), "_")
+	exeLikePaths = lo.Filter(exeLikePaths, func(rsFilePath string, _ int) bool {
+		return !strings.HasPrefix(filepath.Base(rsFilePath), ".") &&
+			!strings.HasPrefix(filepath.Base(rsFilePath), "_")
 	})
 	if len(exeLikePaths) == 0 {
 		return nil
 	}
-	return &CabalScriptManager{
+	return &CargoScriptManager{
 		exeLikePaths: exeLikePaths,
 	}
 }
 
 func init() {
 	common.RegisterManagerFactory(
-		"Cabal Executable-likes Manager",
-		newCabalScriptManager,
+		"Cargo Project Manager",
+		newCargoScriptManager,
 		50,
 	)
 }

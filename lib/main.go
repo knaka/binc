@@ -20,6 +20,7 @@ import (
 	_ "github.com/knaka/binc/lib/golang"
 	_ "github.com/knaka/binc/lib/haskell"
 	_ "github.com/knaka/binc/lib/java"
+	_ "github.com/knaka/binc/lib/rust"
 	_ "github.com/knaka/binc/lib/scala"
 )
 
@@ -167,7 +168,7 @@ func install(path string) (err error) {
 
 func Main(args []string) (err error) {
 	defer Catch(&err)
-	Debugger()
+	//Debugger()
 	shouldRebuild := os.Getenv("BUILD") != "" || os.Getenv("REBUILD") != ""
 	if filepath.Base(args[0]) != appBase &&
 		// GoLand run configuration workaround

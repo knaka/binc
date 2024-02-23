@@ -46,7 +46,7 @@ var goCmd = sync.OnceValues(func() (goPath string, err error) {
 	if stat, err := os.Stat(path); err == nil && !stat.IsDir() {
 		return path, nil
 	}
-	goPath = Ensure(exec.LookPath("go"))
+	goPath = V(exec.LookPath("go"))
 	if err == nil {
 		return goPath, nil
 	}
@@ -91,7 +91,7 @@ func splitArgs(goCmd string, args []string) (runArgs []string, cmdArgs []string,
 
 var goEnv = sync.OnceValues(func() (goEnv_ GoEnv, err error) {
 	defer Catch(&err)
-	outStr := Ensure(exec.Command(Ensure(goCmd()), "env", "-json").Output())
-	Ensure0(json.Unmarshal(outStr, &goEnv_))
+	outStr := V(exec.Command(V(goCmd()), "env", "-json").Output())
+	V0(json.Unmarshal(outStr, &goEnv_))
 	return
 })

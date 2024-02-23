@@ -66,7 +66,7 @@ func ensureClassFile(javaFilePath string, cmdBase string, shouldRebuild bool) (c
 		cmd := exec.Command(V(javacCommand()), "-d", filepath.Dir(classFilePath), javaFilePath)
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
-		Ensure0(cmd.Run())
+		V0(cmd.Run())
 		buildInfoJson := V(json.Marshal(buildInfo))
 		V0(os.WriteFile(V(common.InfoFilePath(buildInfo.Hash)), buildInfoJson, 0644))
 		log.Println("built:", classFilePath)
@@ -115,7 +115,7 @@ func newJavaClassManager(dirPath string) common.Manager {
 	}
 	var matchedPaths []string
 	for _, ext := range extensions {
-		matchedPaths = append(matchedPaths, Ensure(filepath.Glob(filepath.Join(dirPath, "*"+ext)))...)
+		matchedPaths = append(matchedPaths, V(filepath.Glob(filepath.Join(dirPath, "*"+ext)))...)
 	}
 	if len(matchedPaths) == 0 {
 		return nil

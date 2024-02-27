@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/knaka/binc/lib/common"
-	. "github.com/knaka/go-utils"
-	"github.com/samber/lo"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/knaka/binc/lib/common"
+	. "github.com/knaka/go-utils"
+	"github.com/samber/lo"
 )
 
 type CargoScriptManager struct {
@@ -148,6 +149,7 @@ func (m *CargoScriptManager) Run(args []string, shouldRebuild bool) (err error) 
 						"-Z", "unstable-options",
 						"-C", filepath.Dir(cargoFilePath),
 						"run", "--quiet", "--bin", cmdBase,
+						"--",
 					}, args[1:]...)...)
 					cmd.Stdin = os.Stdin
 					cmd.Stdout = os.Stdout

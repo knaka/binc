@@ -73,11 +73,13 @@ func CachedExePath(h hash.Hash, base string) (cachedExePath string, err error) {
 	return
 }
 
+const InfoFileBase = ".info.json"
+
 func InfoFilePath(h hash.Hash) (infoFile string, err error) {
 	defer Catch(&err)
 	infoFile = filepath.Join(
 		V(CacheDirPath(h)),
-		".info.json",
+		InfoFileBase,
 	)
 	return infoFile, err
 }

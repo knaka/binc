@@ -10,11 +10,13 @@ import (
 	. "github.com/knaka/go-utils"
 	"github.com/samber/lo"
 	"io"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	// Load all the language managers.
 	_ "github.com/knaka/binc/lib/golang"
@@ -67,8 +69,41 @@ func which(cmdBase string) (err error) {
 	}, nil)
 }
 
+// Average number of launches between cleanups
+const cleanupCycle = 100
+
+// Number of days after which a binary is considered old
+const cleanupThresholdDays = 90
+
+// cleanupOldBinaries removes old binaries from the cache directory occasionally.
+func cleanupOldBinaries(dirPath string) (err error) {
+	if rand.Intn(cleanupCycle) != 0 {
+		return nil
+	}
+	dirEntries := V(os.ReadDir(dirPath))
+	if err != nil {
+		return err
+	}
+	for _, dirEntry := range dirEntries {
+		if !dirEntry.IsDir() {
+			continue
+		}
+		statInfoFile := V(os.Stat(filepath.Join(dirPath, dirEntry.Name(), common.InfoFileBase)))
+		if statInfoFile.IsDir() {
+			continue
+		}
+		if statInfoFile.ModTime().After(statInfoFile.ModTime().Add(-cleanupThresholdDays * 24 * time.Hour)) {
+			continue
+		}
+		V0(os.RemoveAll(filepath.Join(dirPath, dirEntry.Name())))
+	}
+	return nil
+}
+
 func recreateLinks() (err error) {
 	defer Catch(&err)
+	// Clean up old binaries.
+	V0(cleanupOldBinaries(V(common.CacheRootDirPath())))
 	linksDirPath := V(common.LinksDirPath())
 	// Remove all symlinks in the “links” directory.
 	for _, dirEntry := range V(os.ReadDir(linksDirPath)) {
@@ -170,13 +205,13 @@ func Main(args []string) (err error) {
 	defer Catch(&err)
 	//Debugger()
 	shouldRebuild := os.Getenv("BUILD") != "" || os.Getenv("REBUILD") != ""
-	if filepath.Base(args[0]) != appBase &&
+	if filepath.Base(args[0]) != appBase && // As symlink.
 		// GoLand run configuration workaround
 		!strings.HasSuffix(args[0], "_"+appBase) {
 		commandArgs := args
 		return execute(commandArgs, shouldRebuild)
 	}
-	if len(args[1:]) == 0 {
+	if len(args[1:]) == 0 { // Without subcommand.
 		return recreateLinks()
 	}
 	switch args[1] {

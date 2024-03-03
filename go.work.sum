@@ -1,3 +1,8 @@
+github.com/knaka/go-testutils v0.0.2024030337 h1:R/SV4K4c5+C3pF0u2qQ4PML5rW2M774/wWx8H7B1jUA=
+github.com/knaka/go-testutils v0.0.2024030337/go.mod h1:sczRjUd8AaYu0bq8v7u3HowhYkfTHpjWGfpnKJRjXmw=
+github.com/knaka/go-utils v0.0.2024030337/go.mod h1:pPo2tS2TMayST0eq5PamI6rYk32xsysDHFhdJ2MbwIE=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/stretchr/objx v0.5.0 h1:1zr/of2m5FGMsad5YfcqgdqdWrIhu+EBEJRhR1U7z/c=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=
 golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 h1:LQmS1nU0twXLA96Kt7U9qtHJEbBk3z6Q0V4UXjZkpr4=

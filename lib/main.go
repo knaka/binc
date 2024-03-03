@@ -75,12 +75,37 @@ const cleanupCycle = 100
 // Number of days after which a binary is considered old
 const cleanupThresholdDays = 90
 
+type intRandFnT func(int) int
+
+type optionsT struct {
+	intRandFn intRandFnT
+}
+
+type optSetterFnT func(*optionsT)
+
+//goland:noinspection GoExportedFuncWithUnexportedType
+func randFn(fn intRandFnT) optSetterFnT {
+	return func(opts *optionsT) {
+		opts.intRandFn = fn
+	}
+}
+
 // cleanupOldBinaries removes old binaries from the cache directory occasionally.
-func cleanupOldBinaries(dirPath string) (err error) {
-	if rand.Intn(cleanupCycle) != 0 {
+func cleanupOldBinaries(
+	cacheRootDirPath string,
+	optSetterFnS ...optSetterFnT,
+) (err error) {
+	defer Catch(&err)
+	options := optionsT{
+		intRandFn: rand.Intn,
+	}
+	for _, optSetterFn := range optSetterFnS {
+		optSetterFn(&options)
+	}
+	if options.intRandFn(cleanupCycle) != 0 {
 		return nil
 	}
-	dirEntries := V(os.ReadDir(dirPath))
+	dirEntries := V(os.ReadDir(cacheRootDirPath))
 	if err != nil {
 		return err
 	}
@@ -88,14 +113,14 @@ func cleanupOldBinaries(dirPath string) (err error) {
 		if !dirEntry.IsDir() {
 			continue
 		}
-		statInfoFile := V(os.Stat(filepath.Join(dirPath, dirEntry.Name(), common.InfoFileBase)))
+		statInfoFile := V(os.Stat(filepath.Join(cacheRootDirPath, dirEntry.Name(), common.InfoFileBase)))
 		if statInfoFile.IsDir() {
 			continue
 		}
-		if statInfoFile.ModTime().After(statInfoFile.ModTime().Add(-cleanupThresholdDays * 24 * time.Hour)) {
+		if statInfoFile.ModTime().After(time.Now().Add(-cleanupThresholdDays * 24 * time.Hour)) {
 			continue
 		}
-		V0(os.RemoveAll(filepath.Join(dirPath, dirEntry.Name())))
+		V0(os.RemoveAll(filepath.Join(cacheRootDirPath, dirEntry.Name())))
 	}
 	return nil
 }

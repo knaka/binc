@@ -26,6 +26,13 @@ import (
 	_ "github.com/knaka/binc/lib/scala"
 )
 
+//go:generate -command mockgen go run github.com/knaka/go-run-cache@latest go.uber.org/mock/mockgen@latest
+
+//go:generate mockgen -package=mock -destination mock/main.go . MyDep
+type MyDep interface {
+	RandIntN(int) int
+}
+
 const appBase = "binc"
 
 func iterateOverManagers(
@@ -75,18 +82,18 @@ const cleanupCycle = 100
 // Number of days after which a binary is considered old
 const cleanupThresholdDays = 90
 
-type intRandFnT func(int) int
+type randIntNFnT func(int) int
 
 type optionsT struct {
-	intRandFn intRandFnT
+	randIntNFn randIntNFnT
 }
 
 type optSetterFnT func(*optionsT)
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func withRandFn(fn intRandFnT) optSetterFnT {
+func withRandFn(fn randIntNFnT) optSetterFnT {
 	return func(opts *optionsT) {
-		opts.intRandFn = fn
+		opts.randIntNFn = fn
 	}
 }
 
@@ -97,12 +104,12 @@ func cleanupOldBinaries(
 ) (err error) {
 	defer Catch(&err)
 	options := optionsT{
-		intRandFn: rand.Intn,
+		randIntNFn: rand.Intn,
 	}
 	for _, optSetterFn := range optSetterFnS {
 		optSetterFn(&options)
 	}
-	if options.intRandFn(cleanupCycle) != 0 {
+	if options.randIntNFn(cleanupCycle) != 0 {
 		return nil
 	}
 	dirEntries := V(os.ReadDir(cacheRootDirPath))

@@ -84,7 +84,7 @@ type optionsT struct {
 type optSetterFnT func(*optionsT)
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func randFn(fn intRandFnT) optSetterFnT {
+func withRandFn(fn intRandFnT) optSetterFnT {
 	return func(opts *optionsT) {
 		opts.intRandFn = fn
 	}

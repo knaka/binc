@@ -2,13 +2,12 @@ package lib
 
 import (
 	testfsutils "github.com/knaka/go-testutils/fs"
+	. "github.com/knaka/go-utils"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	. "github.com/knaka/go-utils"
 )
 
 func AlwaysZero(_ int) int {
@@ -36,8 +35,9 @@ func TestCleanupOldBinaries(t *testing.T) {
 		time.Time{},
 		time.Now().AddDate(0, 0, -cleanupThresholdDays+1),
 	))
+	assert.Len(t, V(os.ReadDir(cacheRootDirPath)), 2)
 	// Pass AlwaysZero to make the test deterministic.
-	V0(cleanupOldBinaries(cacheRootDirPath, randFn(AlwaysZero)))
+	V0(cleanupOldBinaries(cacheRootDirPath, withRandFn(AlwaysZero)))
 	dirEntries := V(os.ReadDir(cacheRootDirPath))
 	assert.Len(t, dirEntries, 1)
 	assert.Equal(t, "9b19d37", dirEntries[0].Name())
